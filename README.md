@@ -4,6 +4,19 @@ A WhatsApp automation bot that monitors IIT Madras buy/sell groups for mess coup
 
 ## What It Does
 
+### The Problem
+
+At IIT Madras, students often sell their unused mess coupons in WhatsApp groups like "Buy & Sell @ IIT Madras". If you want to buy a coupon:
+
+- You have to **constantly monitor** these groups (100+ messages/day)
+- When someone posts "selling lunch coupon", you have to **reply fast** before others grab it
+- You need to **negotiate** - ask which mess, confirm price, get UPI details
+- If you're in class or busy, you **miss the deal**
+
+### The Solution
+
+This bot does all of that **automatically**:
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        BOT WORKFLOW                              │
@@ -29,6 +42,97 @@ A WhatsApp automation bot that monitors IIT Madras buy/sell groups for mess coup
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Step-by-Step Example
+
+**Morning Setup:**
+```
+Bot: 🍽️ LUNCH MESS PREFERENCE
+     Which mess do you prefer for lunch today?
+     0. Any (no preference)
+     1. SGR
+     2. SRR
+     3. Firstman
+     ...
+
+You: 3
+
+Bot: ✅ Preferences saved! Lunch: Firstman
+     Now looking for matching coupons...
+```
+
+**When Someone Posts in the Group:**
+```
+Group Message: "selling lunch firstman 70"
+                         ↓
+        Bot detects: lunch coupon, Firstman mess, ₹70
+                         ↓
+        Bot auto-DMs seller: "saw your message about Firstman
+                              lunch coupon, still available?"
+                         ↓
+        Seller replies: "yes"
+                         ↓
+        Bot asks: "UPI ID?"
+                         ↓
+        Seller: "9876543210@paytm"
+                         ↓
+        Bot notifies YOU via WhatsApp + Web Dashboard
+```
+
+**You Get Notified:**
+```
+Bot: 🎫 DEAL READY!
+
+     Seller: Rahul
+     Type: Lunch
+     Mess: Firstman ✓ (matches your preference)
+     Price: ₹70
+     UPI: 9876543210@paytm
+
+     Reply "ok" to confirm or "no" to decline
+```
+
+**You Confirm & Pay:**
+```
+You: ok
+
+Bot → Seller: "hold on, paying"
+
+[You open GPay/PhonePe, send ₹70 to the UPI ID]
+
+You: paid
+
+Bot → Seller: "done, sent ₹70"
+
+Seller: [sends coupon QR code image]
+
+Bot: [validates QR code, saves image]
+     ✅ Coupon received and verified!
+
+     Saved to: data/coupons/2024-02-07_lunch_Rahul.jpg
+```
+
+### What Makes It Smart
+
+| Feature | How It Works |
+|---------|--------------|
+| **AI Message Parsing** | Uses Groq LLM to understand natural language like "selling lunch tmrw firstman mess 70rs" |
+| **Fuzzy Matching** | Handles typos like "neelksh" → "Neelkesh", "fristman" → "Firstman" |
+| **Mess Preferences** | Only responds to sellers with your preferred mess (SGR, SRR, Firstman, etc.) |
+| **Price Filtering** | Ignores overpriced coupons (configurable max price) |
+| **Time Awareness** | Stops looking for lunch after 2:10 PM, dinner after 9:10 PM |
+| **QR Validation** | Verifies the received image is actually a valid QR code |
+| **Conversation Memory** | Handles multi-message conversations naturally |
+
+### What You Still Do Manually
+
+The bot handles negotiation, but **you stay in control** for:
+
+1. **Confirming the deal** - Bot asks before committing
+2. **Making payment** - You send money via UPI (bot never touches money)
+3. **Final decision** - You can decline any deal with "no"
+
+This keeps you safe while saving hours of group monitoring.
 
 ## Features
 
