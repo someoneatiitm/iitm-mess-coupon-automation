@@ -1,5 +1,7 @@
 # IITM Mess Coupon Automation
 
+> **Disclaimer:** This bot is intended for **fair use only** - helping you buy mess coupons from students who genuinely want to sell their unused coupons on unofficial buy & sell groups. It is **not intended for any illegal or unfair practices**. The bot enforces a limit of **1 coupon per session** (lunch and dinner are separate sessions), respecting the mess coupon system. This bot **cannot be used to buy breakfast or snacks coupons** - it only supports lunch and dinner coupons.
+
 A WhatsApp automation bot that monitors IIT Madras buy/sell groups for mess coupon listings, automatically negotiates with sellers, and completes purchases - saving you time and ensuring you never miss a deal.
 
 ## What It Does
