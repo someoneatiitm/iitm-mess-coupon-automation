@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output (will be built inside container)
+dist/
+
+# Environment files (should be mounted or passed via docker-compose)
+.env
+
+# WhatsApp session data (should be mounted as volume)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Runtime data (should be mounted as volume)
+data/
+
+# Logs
+logs/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+
+# Deploy scripts
+deploy/

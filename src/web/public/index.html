@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mess Coupon Bot</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #000000;
+      --bg-secondary: #1c1c1e;
+      --bg-tertiary: #2c2c2e;
+      --bg-card: rgba(28, 28, 30, 0.8);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.7);
+      --text-tertiary: rgba(255, 255, 255, 0.5);
+      --accent-blue: #0a84ff;
+      --accent-green: #30d158;
+      --accent-orange: #ff9f0a;
+      --accent-red: #ff453a;
+      --accent-purple: #bf5af2;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app { max-width: 1400px; margin: 0 auto; padding: 40px 24px; }
+
+    /* Header */
+    .header { text-align: center; margin-bottom: 48px; }
+    .header h1 {
+      font-size: 48px; font-weight: 700; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header .subtitle { font-size: 17px; color: var(--text-secondary); margin-top: 8px; }
+    .mode-indicator {
+      display: inline-flex; align-items: center; gap: 8px; margin-top: 16px;
+      padding: 8px 16px; background: var(--bg-tertiary); border-radius: 20px;
+      font-size: 13px; font-weight: 600; text-transform: uppercase;
+    }
+    .mode-indicator .dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+    .mode-indicator.real .dot { background: var(--accent-green); }
+    .mode-indicator.test .dot { background: var(--accent-orange); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* Tabs */
+    .tabs {
+      display: flex; justify-content: center; gap: 8px; margin-bottom: 32px;
+      background: var(--bg-secondary); padding: 6px; border-radius: 12px; width: fit-content; margin-left: auto; margin-right: auto;
+    }
+    .tab {
+      padding: 10px 24px; border: none; background: transparent; color: var(--text-secondary);
+      font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    .tab.active { background: var(--accent-blue); color: white; }
+    .tab:hover:not(.active) { color: var(--text-primary); }
+
+    /* Tab Content */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Grid */
+    .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card); border-radius: 20px; padding: 28px;
+      backdrop-filter: blur(40px); border: 1px solid var(--border-color);
+      transition: transform 0.3s, box-shadow 0.3s; overflow: visible;
+      position: relative;
+    }
+    .card.dropdown-open { z-index: 100; }
+    .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .card-title { font-size: 20px; font-weight: 600; }
+
+    /* Status */
+    .status-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .status-card { background: var(--bg-tertiary); border-radius: 16px; padding: 20px; text-align: center; }
+    .status-card .meal-type { font-size: 13px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 12px; }
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; }
+    .status-badge.bought { background: rgba(48, 209, 88, 0.15); color: var(--accent-green); }
+    .status-badge.needed { background: rgba(255, 159, 10, 0.15); color: var(--accent-orange); }
+    .status-badge.paused { background: rgba(191, 90, 242, 0.15); color: var(--accent-purple); }
+    .status-badge.skipped { background: rgba(255, 255, 255, 0.1); color: var(--text-tertiary); }
+
+    /* Toggle button (Reset/Mark Bought) */
+    .toggle-btn {
+      border: none; padding: 6px 12px; border-radius: 8px; font-size: 11px;
+      font-weight: 600; cursor: pointer; margin-top: 10px; transition: all 0.2s;
+    }
+    .toggle-btn.reset { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); }
+    .toggle-btn.reset:hover { background: rgba(255, 69, 58, 0.3); }
+    .toggle-btn.mark-bought { background: rgba(48, 209, 88, 0.15); color: var(--accent-green); }
+    .toggle-btn.mark-bought:hover { background: rgba(48, 209, 88, 0.3); }
+
+    /* Preference */
+    .preference-section { overflow: visible; }
+    .preference-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid var(--border-color); overflow: visible; }
+    .preference-row:last-child { border-bottom: none; }
+
+    /* Multi-select dropdown */
+    .multi-select { position: relative; width: 180px; z-index: 10; }
+    .multi-select.open { z-index: 1000; }
+    .multi-select-trigger {
+      background: var(--bg-tertiary); color: var(--text-primary);
+      border: 1px solid var(--border-color); padding: 10px 36px 10px 14px;
+      border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer;
+      display: flex; align-items: center; gap: 6px; height: 42px;
+      overflow-x: auto; overflow-y: hidden; white-space: nowrap;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .multi-select-trigger::-webkit-scrollbar { display: none; }
+    .multi-select-trigger:hover { border-color: var(--accent-blue); }
+    /* Gradient fade on right side */
+    .multi-select-trigger::before {
+      content: ''; position: absolute; right: 1px; top: 1px; bottom: 1px; width: 40px;
+      background: linear-gradient(to right, transparent, var(--bg-tertiary) 50%);
+      border-radius: 0 9px 9px 0; pointer-events: none; z-index: 1;
+    }
+    /* Dropdown arrow */
+    .multi-select-trigger::after {
+      content: ''; position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid var(--text-secondary);
+      pointer-events: none; z-index: 2;
+    }
+    .multi-select.open .multi-select-trigger::after { transform: translateY(-50%) rotate(180deg); }
+    .multi-select-placeholder { color: var(--text-secondary); }
+    .selected-tag {
+      background: var(--accent-blue); color: white; padding: 2px 8px; border-radius: 6px;
+      font-size: 12px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+    }
+    .selected-tag .remove { cursor: pointer; opacity: 0.8; }
+    .selected-tag .remove:hover { opacity: 1; }
+    .multi-select-dropdown {
+      position: absolute; top: 100%; left: 0; margin-top: 4px; min-width: 180px;
+      background: var(--bg-tertiary); border: 1px solid var(--border-color);
+      border-radius: 10px; padding: 8px 0; z-index: 1001; display: none;
+      max-height: 250px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .multi-select.open .multi-select-dropdown { display: block; }
+    .multi-select-option {
+      padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+      font-size: 14px; transition: background 0.15s; white-space: nowrap;
+    }
+    .multi-select-option:hover { background: rgba(255, 255, 255, 0.1); }
+    .multi-select-option.selected { background: rgba(10, 132, 255, 0.2); }
+    .multi-select-checkbox {
+      width: 18px; height: 18px; border: 2px solid var(--border-color); border-radius: 4px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .multi-select-option.selected .multi-select-checkbox {
+      background: var(--accent-blue); border-color: var(--accent-blue);
+    }
+    .multi-select-option.selected .multi-select-checkbox::after {
+      content: '✓'; color: white; font-size: 12px; font-weight: bold;
+    }
+
+    /* Buttons */
+    .btn {
+      flex: 1; padding: 14px 24px; border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-success { background: var(--accent-green); color: white; }
+    .btn-danger { background: var(--accent-red); color: white; }
+    .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
+    .session-controls, .action-buttons { display: flex; gap: 12px; margin-top: 20px; }
+
+    /* Action Card */
+    .action-card {
+      background: linear-gradient(135deg, rgba(255, 159, 10, 0.1) 0%, rgba(255, 69, 58, 0.1) 100%);
+      border: 1px solid var(--accent-orange); animation: glow 2s ease-in-out infinite;
+    }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(255, 159, 10, 0.2); } 50% { box-shadow: 0 0 40px rgba(255, 159, 10, 0.4); } }
+    .deal-info { background: var(--bg-tertiary); border-radius: 12px; padding: 16px; margin: 16px 0; }
+    .deal-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+    .deal-row .label { color: var(--text-tertiary); }
+    .deal-row .value { font-weight: 600; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--bg-tertiary); border-radius: 12px; padding: 16px; text-align: center; }
+    .stat-value { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { font-size: 12px; color: var(--text-tertiary); text-transform: uppercase; }
+    .stat-card.success .stat-value { color: var(--accent-green); }
+    .stat-card.failed .stat-value { color: var(--accent-red); }
+    .stat-card.spent .stat-value { color: var(--accent-blue); }
+
+    /* History List */
+    .history-list { display: flex; flex-direction: column; gap: 12px; max-height: 600px; overflow-y: auto; }
+    .history-item {
+      display: flex; align-items: center; gap: 16px; background: var(--bg-tertiary);
+      border-radius: 16px; padding: 16px; cursor: pointer; transition: all 0.2s;
+    }
+    .history-item:hover { background: rgba(255, 255, 255, 0.08); }
+    .history-icon {
+      width: 56px; height: 56px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;
+    }
+    .history-icon.lunch { background: linear-gradient(135deg, #ff9f0a 0%, #ff6b00 100%); }
+    .history-icon.dinner { background: linear-gradient(135deg, #bf5af2 0%, #8944d4 100%); }
+    .history-icon.failed { background: linear-gradient(135deg, #ff453a 0%, #c73030 100%); }
+    .history-details { flex: 1; }
+    .history-details .title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .history-details .meta { font-size: 13px; color: var(--text-tertiary); }
+    .history-status { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+    .history-status.success { background: rgba(48, 209, 88, 0.15); color: var(--accent-green); }
+    .history-status.failed { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center;
+      z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.3s;
+    }
+    .modal-overlay.active { opacity: 1; visibility: visible; }
+    .modal {
+      background: var(--bg-secondary); border-radius: 20px; padding: 32px;
+      max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;
+      transform: scale(0.9); transition: transform 0.3s;
+    }
+    .modal-overlay.active .modal { transform: scale(1); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .modal-title { font-size: 22px; font-weight: 600; }
+    .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; }
+    .modal-image { width: 100%; border-radius: 12px; margin-bottom: 20px; }
+    .modal-info { background: var(--bg-tertiary); border-radius: 12px; padding: 16px; }
+    .modal-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+    .modal-row:last-child { border-bottom: none; }
+
+    /* Conversations & Log */
+    .conversation-list, .log-container { display: flex; flex-direction: column; gap: 12px; max-height: 320px; overflow-y: auto; }
+    .conversation-item, .log-entry { background: var(--bg-tertiary); border-radius: 12px; padding: 16px; }
+    .conversation-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .conversation-seller { font-weight: 600; }
+    .conversation-state { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; }
+    .conversation-state.awaiting { background: rgba(255, 159, 10, 0.15); color: var(--accent-orange); }
+    .conversation-state.payment { background: rgba(10, 132, 255, 0.15); color: var(--accent-blue); }
+    .conv-action-btn {
+      padding: 6px 12px; border: none; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .conv-action-btn.complete {
+      background: rgba(48, 209, 88, 0.15); color: var(--accent-green);
+    }
+    .conv-action-btn.complete:hover { background: rgba(48, 209, 88, 0.3); }
+    .conv-action-btn.fail {
+      background: rgba(255, 69, 58, 0.15); color: var(--accent-red);
+    }
+    .conv-action-btn.fail:hover { background: rgba(255, 69, 58, 0.3); }
+    .log-entry { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; }
+    .log-entry .time { color: var(--text-tertiary); flex-shrink: 0; }
+    .log-entry .message { color: var(--text-secondary); }
+
+    /* Empty State */
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-tertiary); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+
+    /* Connection */
+    .connection-indicator {
+      position: fixed; bottom: 24px; right: 24px; display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; background: var(--bg-card); backdrop-filter: blur(20px);
+      border-radius: 20px; border: 1px solid var(--border-color); font-size: 13px; font-weight: 500;
+    }
+    .connection-indicator .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .connection-indicator.connected .dot { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+    .connection-indicator.disconnected .dot { background: var(--accent-red); }
+
+    /* Toast */
+    .toast-container { position: fixed; top: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column; gap: 12px; }
+    .toast {
+      display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+      background: var(--bg-card); backdrop-filter: blur(20px); border-radius: 14px;
+      border: 1px solid var(--border-color); box-shadow: var(--shadow);
+      animation: slideIn 0.3s ease; max-width: 380px;
+    }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .toast.success .icon { color: var(--accent-green); }
+    .toast.error .icon { color: var(--accent-red); }
+    .toast .title { font-weight: 600; font-size: 14px; }
+    .toast .message { font-size: 13px; color: var(--text-secondary); }
+
+    .hidden { display: none !important; }
+
+    /* Login Page */
+    .login-page {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 80vh; text-align: center;
+    }
+    .login-card {
+      background: var(--bg-card); border-radius: 24px; padding: 48px;
+      backdrop-filter: blur(40px); border: 1px solid var(--border-color);
+      max-width: 420px; width: 100%;
+    }
+    .login-card h2 { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
+    .login-card .subtitle { color: var(--text-secondary); margin-bottom: 32px; }
+    .qr-container {
+      background: white; border-radius: 16px; padding: 20px;
+      display: inline-block; margin-bottom: 24px;
+    }
+    .qr-container img, .qr-container canvas { display: block; }
+    .qr-placeholder {
+      width: 200px; height: 200px; display: flex; align-items: center; justify-content: center;
+      color: var(--bg-primary); font-size: 14px;
+    }
+    .login-status {
+      padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 500;
+      background: var(--bg-tertiary); color: var(--text-secondary);
+    }
+    .login-status.success { background: rgba(48, 209, 88, 0.15); color: var(--accent-green); }
+    .login-status.error { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); }
+
+    /* User Badge & Logout */
+    .user-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 8px 16px; background: var(--bg-tertiary); border-radius: 20px;
+      font-size: 13px; margin-top: 12px;
+    }
+    .user-badge .phone { font-weight: 600; color: var(--accent-green); }
+    .logout-btn {
+      background: rgba(255, 69, 58, 0.15); color: var(--accent-red);
+      border: none; padding: 6px 12px; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .logout-btn:hover { background: rgba(255, 69, 58, 0.3); }
+
+    /* Chat View Dropdown */
+    .chat-toggle {
+      display: flex; align-items: center; gap: 6px; margin-top: 8px;
+      color: var(--accent-blue); font-size: 12px; font-weight: 600;
+      cursor: pointer; background: none; border: none; padding: 4px 0;
+    }
+    .chat-toggle:hover { text-decoration: underline; }
+    .chat-toggle .arrow { transition: transform 0.3s ease; }
+    .chat-toggle.open .arrow { transform: rotate(180deg); }
+    .chat-container {
+      margin-top: 12px; border-radius: 12px; overflow: hidden;
+      background: #0b141a; max-height: 0; opacity: 0;
+      transition: max-height 0.4s ease, opacity 0.3s ease;
+    }
+    .chat-container.open { max-height: 400px; opacity: 1; }
+    .chat-container.closing {
+      max-height: 0 !important; opacity: 0;
+      transition: max-height 0.4s ease, opacity 0.3s ease;
+    }
+    .chat-messages {
+      padding: 12px; display: flex; flex-direction: column; gap: 8px;
+      max-height: 350px; overflow-y: auto;
+    }
+    .chat-message {
+      max-width: 80%; padding: 8px 12px; border-radius: 8px;
+      font-size: 13px; line-height: 1.4; word-wrap: break-word;
+    }
+    .chat-message.bot {
+      align-self: flex-end; background: #005c4b; color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-message.seller {
+      align-self: flex-start; background: #202c33; color: white;
+      border-bottom-left-radius: 4px;
+    }
+    .chat-message .time {
+      font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 4px;
+      text-align: right;
+    }
+    .chat-message.seller .time { text-align: left; }
+    .chat-empty {
+      text-align: center; color: var(--text-tertiary); padding: 20px;
+      font-size: 13px;
+    }
+
+    /* Chat Result Animation */
+    .chat-result {
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 12px; padding: 20px; border-radius: 16px;
+      background: var(--bg-tertiary); opacity: 0; transform: scale(0.3) rotate(-10deg);
+      animation: resultPopIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+      position: relative; overflow: hidden;
+    }
+    .chat-result.success {
+      background: linear-gradient(135deg, rgba(48, 209, 88, 0.15), rgba(48, 209, 88, 0.05));
+      box-shadow: 0 4px 20px rgba(48, 209, 88, 0.2);
+    }
+    .chat-result.failed {
+      background: linear-gradient(135deg, rgba(255, 69, 58, 0.15), rgba(255, 69, 58, 0.05));
+      box-shadow: 0 4px 20px rgba(255, 69, 58, 0.2);
+    }
+    @keyframes resultPopIn {
+      0% { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+      50% { opacity: 1; transform: scale(1.1) rotate(3deg); }
+      70% { transform: scale(0.95) rotate(-1deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+    .chat-result svg { width: 56px; height: 56px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+    .chat-result.success svg { color: var(--accent-green); animation: successPulse 1s ease-in-out infinite; }
+    .chat-result.failed svg { color: var(--accent-red); animation: failShake 0.5s ease-in-out; }
+
+    @keyframes successPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    @keyframes failShake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-3px); }
+      40%, 80% { transform: translateX(3px); }
+    }
+
+    /* Checkmark animation */
+    .checkmark-circle {
+      stroke-dasharray: 166; stroke-dashoffset: 166;
+      animation: checkStroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    .checkmark-check {
+      stroke-dasharray: 48; stroke-dashoffset: 48;
+      animation: checkStroke 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.4s forwards;
+    }
+    @keyframes checkStroke { to { stroke-dashoffset: 0; } }
+
+    /* Cross animation */
+    .cross-circle {
+      stroke-dasharray: 166; stroke-dashoffset: 166;
+      animation: checkStroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    .cross-line {
+      stroke-dasharray: 30; stroke-dashoffset: 30;
+      animation: crossStroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.4s forwards;
+    }
+    @keyframes crossStroke { to { stroke-dashoffset: 0; } }
+
+    .chat-result-text {
+      margin-left: 14px; font-size: 15px; font-weight: 700;
+      animation: textFadeIn 0.5s ease 0.3s forwards;
+      opacity: 0;
+    }
+    @keyframes textFadeIn {
+      to { opacity: 1; }
+    }
+    .chat-result.success .chat-result-text { color: var(--accent-green); }
+    .chat-result.failed .chat-result-text { color: var(--accent-red); }
+
+    /* Confetti for success */
+    .confetti-container {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; overflow: hidden;
+    }
+    .confetti {
+      position: absolute; width: 8px; height: 8px; border-radius: 2px;
+      animation: confettiFall 1.5s ease-out forwards;
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100px) rotate(720deg); opacity: 0; }
+    }
+
+    /* Glow effect for success */
+    .chat-result.success::before {
+      content: ''; position: absolute; top: 50%; left: 50%;
+      width: 100px; height: 100px; background: radial-gradient(circle, rgba(48, 209, 88, 0.4) 0%, transparent 70%);
+      transform: translate(-50%, -50%); animation: glowPulse 2s ease-in-out infinite;
+    }
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+    }
+
+    /* Slide in animation for completed conversations */
+    @keyframes slideIn {
+      0% { opacity: 0; transform: translateY(-20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Success badge animation */
+    @keyframes successBadge {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.3); }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); }
+    }
+
+    /* Fail badge animation */
+    @keyframes failBadge {
+      0%, 100% { transform: translateX(0); }
+      10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+      20%, 40%, 60%, 80% { transform: translateX(2px); }
+    }
+
+    /* Smooth fade out for completed items */
+    .conversation-item.fading-out {
+      animation: fadeOut 0.5s ease forwards;
+    }
+    @keyframes fadeOut {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.9); }
+    }
+
+    @media (max-width: 768px) {
+      .app { padding: 24px 16px; }
+      .header h1 { font-size: 32px; }
+      .status-row, .stats-grid { grid-template-columns: 1fr; }
+      .session-controls, .action-buttons { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Login Page (shown when not logged in) -->
+    <div id="loginPage" class="login-page">
+      <div class="login-card">
+        <h2>Welcome</h2>
+        <p class="subtitle">Scan the QR code with WhatsApp to login</p>
+        <div class="qr-container">
+          <div id="qrCode" class="qr-placeholder">Waiting for QR code...</div>
+        </div>
+        <div id="loginStatus" class="login-status">Initializing...</div>
+      </div>
+    </div>
+
+    <!-- Main App (shown when logged in) -->
+    <div id="mainApp" class="hidden">
+      <header class="header">
+        <h1>Mess Coupon Bot</h1>
+        <p class="subtitle">Automated coupon purchasing for IIT Madras</p>
+        <div id="modeIndicator" class="mode-indicator test">
+          <span class="dot"></span>
+          <span id="modeText">Test Mode</span>
+        </div>
+        <div id="userBadge" class="user-badge">
+          <span>Logged in as</span>
+          <span id="userPhone" class="phone">••••••0000</span>
+          <button class="logout-btn" onclick="handleLogout()">Logout</button>
+        </div>
+      </header>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
+        <button class="tab" onclick="switchTab('history')">History</button>
+      </div>
+
+    <!-- Dashboard Tab -->
+    <div id="dashboardTab" class="tab-content active">
+      <div class="main-grid">
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <!-- Status Card -->
+          <div class="card" id="statusCard">
+            <div class="card-header"><h2 class="card-title">Today's Status</h2></div>
+            <div class="status-row">
+              <div class="status-card">
+                <div class="meal-type">Lunch</div>
+                <div id="lunchStatus" class="status-badge needed">Needed</div>
+                <button id="lunchToggleBtn" class="toggle-btn mark-bought" onclick="toggleSessionStatus('lunch')">Mark Bought</button>
+              </div>
+              <div class="status-card">
+                <div class="meal-type">Dinner</div>
+                <div id="dinnerStatus" class="status-badge needed">Needed</div>
+                <button id="dinnerToggleBtn" class="toggle-btn mark-bought" onclick="toggleSessionStatus('dinner')">Mark Bought</button>
+              </div>
+            </div>
+            <div class="preference-section">
+              <div class="preference-row">
+                <span style="color: var(--text-secondary)">Lunch Preference</span>
+                <div class="multi-select" id="lunchPreference" data-type="lunch">
+                  <div class="multi-select-trigger" onclick="toggleMultiSelect('lunchPreference')">
+                    <span class="multi-select-placeholder">Any Mess</span>
+                  </div>
+                  <div class="multi-select-dropdown"></div>
+                </div>
+              </div>
+              <div class="preference-row">
+                <span style="color: var(--text-secondary)">Dinner Preference</span>
+                <div class="multi-select" id="dinnerPreference" data-type="dinner">
+                  <div class="multi-select-trigger" onclick="toggleMultiSelect('dinnerPreference')">
+                    <span class="multi-select-placeholder">Any Mess</span>
+                  </div>
+                  <div class="multi-select-dropdown"></div>
+                </div>
+              </div>
+            </div>
+            <div class="session-controls">
+              <button class="btn btn-success" onclick="startSession()"><span>▶</span> Start</button>
+              <button class="btn btn-secondary" onclick="stopSession()"><span>⏹</span> Stop</button>
+            </div>
+          </div>
+
+          <!-- Action Card -->
+          <div id="actionCard" class="card action-card hidden">
+            <div class="card-header"><h2 class="card-title">Action Required</h2></div>
+            <p id="actionDescription" style="color: var(--text-secondary); margin-bottom: 16px;">A seller is ready.</p>
+            <div class="deal-info">
+              <div class="deal-row"><span class="label">Seller</span><span id="actionSeller" class="value">-</span></div>
+              <div class="deal-row"><span class="label">Type</span><span id="actionType" class="value">-</span></div>
+              <div class="deal-row"><span class="label">Amount</span><span id="actionAmount" class="value">-</span></div>
+              <div class="deal-row"><span class="label">UPI ID</span><span id="actionUpi" class="value">-</span></div>
+            </div>
+            <div id="confirmButtons" class="action-buttons">
+              <button class="btn btn-success" onclick="confirmPurchase()">Confirm</button>
+              <button class="btn btn-danger" onclick="declinePurchase()">Decline</button>
+            </div>
+            <div id="paymentButtons" class="action-buttons hidden">
+              <button class="btn btn-success" onclick="confirmPayment()">Payment Done</button>
+            </div>
+          </div>
+
+          <!-- Today's Deals -->
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Today's Deals</h2></div>
+            <div id="todayDeals" class="history-list">
+              <div class="empty-state"><div class="icon">🎫</div><div class="text">No deals today</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <!-- Active Conversations -->
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Active Conversations</h2></div>
+            <div id="conversationList" class="conversation-list">
+              <div class="empty-state"><div class="icon">💬</div><div class="text">No active conversations</div></div>
+            </div>
+          </div>
+
+          <!-- Activity Log -->
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Activity Log</h2></div>
+            <div id="logContainer" class="log-container">
+              <div class="empty-state"><div class="icon">📋</div><div class="text">Waiting for activity...</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Tab -->
+    <div id="historyTab" class="tab-content">
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header"><h2 class="card-title">30-Day Statistics</h2></div>
+        <div class="stats-grid">
+          <div class="stat-card success">
+            <div id="statSuccess" class="stat-value">0</div>
+            <div class="stat-label">Successful</div>
+          </div>
+          <div class="stat-card failed">
+            <div id="statFailed" class="stat-value">0</div>
+            <div class="stat-label">Failed</div>
+          </div>
+          <div class="stat-card spent">
+            <div id="statSpent" class="stat-value">₹0</div>
+            <div class="stat-label">Total Spent</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Deal History</h2></div>
+        <div id="historyList" class="history-list">
+          <div class="empty-state"><div class="icon">📜</div><div class="text">No history yet</div></div>
+        </div>
+      </div>
+    </div>
+    </div><!-- End mainApp -->
+  </div>
+
+  <!-- Modal -->
+  <div id="couponModal" class="modal-overlay" onclick="if(event.target === this) closeModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Coupon Details</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <img id="modalImage" class="modal-image" src="" alt="Coupon">
+      <div class="modal-info">
+        <div class="modal-row"><span class="label">Type</span><span id="modalType" class="value">-</span></div>
+        <div class="modal-row"><span class="label">Seller</span><span id="modalSeller" class="value">-</span></div>
+        <div class="modal-row"><span class="label">Mess</span><span id="modalMess" class="value">-</span></div>
+        <div class="modal-row"><span class="label">Amount</span><span id="modalAmount" class="value">-</span></div>
+        <div class="modal-row"><span class="label">Date</span><span id="modalDate" class="value">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connection-indicator disconnected" id="connectionIndicator">
+    <span class="dot"></span><span id="connectionText">Connecting...</span>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const socket = io();
+    let currentStatus = null;
+    let isLoggedIn = false;
+    const logs = [];
+    const MAX_LOGS = 50;
+    const openChats = new Set(); // Track which chat dropdowns are open
+    const previousConversations = new Map(); // Track previous conversation states for detecting completion
+    let pendingQRCode = null; // Store QR code if library not ready yet
+
+    const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+
+    // Socket event handlers
+    socket.on('connect', () => { updateConnectionStatus(true); addLog('success', 'Connected'); });
+    socket.on('disconnect', () => { updateConnectionStatus(false); addLog('error', 'Disconnected'); });
+    socket.on('status', (status) => { currentStatus = status; if (isLoggedIn) updateUI(status); });
+    socket.on('log', (log) => { addLog(log.level, log.message); });
+    socket.on('notification', (notif) => {
+      showToast(notif.type, notif.title, notif.message);
+    });
+
+    // Listen for conversation end events from server (backup notification)
+    socket.on('conversationEnd', (data) => {
+      console.log('🎬 Conversation end event received:', data);
+      // Animation is now handled by updateConversations when it detects state change
+    });
+
+    // Auth events
+    socket.on('auth', (auth) => {
+      console.log('Auth event:', auth);
+      const wasLoggedIn = isLoggedIn;
+      isLoggedIn = auth.isLoggedIn;
+      updateAuthUI(auth);
+
+      // Clear local state when logging out
+      if (wasLoggedIn && !isLoggedIn) {
+        currentStatus = null;
+        previousConversations.clear();
+        openChats.clear();
+        logs.length = 0;
+        document.getElementById('logContainer').innerHTML = '<div class="empty-state"><div class="icon">📋</div><div class="text">Waiting for activity...</div></div>';
+      }
+    });
+
+    socket.on('qr', (data) => {
+      console.log('QR event received:', data.qr ? 'QR data present' : 'No QR');
+      if (data.qr) {
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+          displayQRCode(data.qr);
+          const statusEl = document.getElementById('loginStatus');
+          if (statusEl) {
+            statusEl.textContent = 'Scan with WhatsApp';
+            statusEl.className = 'login-status';
+          }
+        }, 50);
+      }
+    });
+
+    // Auth UI update
+    function updateAuthUI(auth) {
+      const loginPage = document.getElementById('loginPage');
+      const mainApp = document.getElementById('mainApp');
+
+      if (auth.isLoggedIn) {
+        loginPage.classList.add('hidden');
+        mainApp.classList.remove('hidden');
+        if (auth.userPhone) {
+          document.getElementById('userPhone').textContent = auth.userPhone;
+        }
+      } else {
+        loginPage.classList.remove('hidden');
+        mainApp.classList.add('hidden');
+
+        const status = document.getElementById('loginStatus');
+        if (auth.error) {
+          status.textContent = 'Error: ' + auth.error;
+          status.className = 'login-status error';
+        } else if (auth.message) {
+          status.textContent = auth.message;
+          status.className = 'login-status';
+        } else if (auth.hasQR) {
+          status.textContent = 'Scan QR code with WhatsApp';
+          status.className = 'login-status';
+        } else {
+          status.textContent = 'Waiting for QR code...';
+          status.className = 'login-status';
+        }
+      }
+    }
+
+    // Display QR code
+    let qrRetryCount = 0;
+    const MAX_QR_RETRIES = 10;
+
+    function displayQRCode(qrData) {
+      if (!qrData) return;
+
+      const container = document.getElementById('qrCode');
+      if (!container) {
+        pendingQRCode = qrData;
+        return;
+      }
+
+      console.log('Attempting to display QR, library available:', typeof QRCode !== 'undefined');
+
+      // Check if QRCode library is loaded
+      if (typeof QRCode === 'undefined' || !QRCode.toCanvas) {
+        qrRetryCount++;
+        if (qrRetryCount < MAX_QR_RETRIES) {
+          console.log('QRCode library not ready, retry', qrRetryCount);
+          pendingQRCode = qrData;
+          setTimeout(() => displayQRCode(qrData), 300);
+          return;
+        } else {
+          // Fallback: use Google Charts API for QR code generation
+          console.log('Using fallback QR method');
+          const encodedData = encodeURIComponent(qrData);
+          container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedData}" alt="QR Code" style="width: 200px; height: 200px;" />`;
+          return;
+        }
+      }
+
+      qrRetryCount = 0;
+      pendingQRCode = null;
+      container.innerHTML = '';
+      const canvas = document.createElement('canvas');
+      container.appendChild(canvas);
+
+      try {
+        QRCode.toCanvas(canvas, qrData, {
+          width: 200,
+          margin: 2,
+          color: { dark: '#000000', light: '#ffffff' }
+        }, (error) => {
+          if (error) {
+            console.error('QR generation error:', error);
+            // Fallback to API
+            const encodedData = encodeURIComponent(qrData);
+            container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedData}" alt="QR Code" style="width: 200px; height: 200px;" />`;
+          }
+        });
+      } catch (err) {
+        console.error('QR display error:', err);
+        // Fallback to API
+        const encodedData = encodeURIComponent(qrData);
+        container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedData}" alt="QR Code" style="width: 200px; height: 200px;" />`;
+      }
+    }
+
+    // Try to display pending QR code when page is fully loaded
+    window.addEventListener('load', () => {
+      if (pendingQRCode) {
+        setTimeout(() => displayQRCode(pendingQRCode), 100);
+      }
+    });
+
+    // Logout handler
+    async function handleLogout() {
+      if (!confirm('Are you sure you want to logout? You will need to scan QR code again.')) return;
+
+      try {
+        showToast('info', 'Logging out', 'Please wait...');
+        const res = await fetch('/api/auth/logout', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('success', 'Logged Out', 'Scan QR to login again');
+          // UI will update via socket event
+        } else {
+          showToast('error', 'Logout Failed', data.error || 'Unknown error');
+        }
+      } catch (error) {
+        showToast('error', 'Logout Failed', 'Network error');
+      }
+    }
+
+    // Check initial auth status
+    async function checkAuthStatus() {
+      try {
+        const res = await fetch('/api/auth/status');
+        const auth = await res.json();
+        console.log('Initial auth status:', auth);
+        updateAuthUI(auth);
+
+        if (!auth.isLoggedIn) {
+          // Always try to get QR code if not logged in
+          const qrRes = await fetch('/api/auth/qr');
+          const qrData = await qrRes.json();
+          console.log('QR response:', qrData);
+          if (qrData.qr) {
+            displayQRCode(qrData.qr);
+          } else {
+            // No QR yet, show waiting message
+            const container = document.getElementById('qrCode');
+            if (container) {
+              container.innerHTML = '<div style="color: #000; padding: 20px; font-size: 14px;">Generating QR code...</div>';
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      }
+    }
+
+    function updateConnectionStatus(connected) {
+      const indicator = document.getElementById('connectionIndicator');
+      document.getElementById('connectionText').textContent = connected ? 'Live' : 'Disconnected';
+      indicator.className = 'connection-indicator ' + (connected ? 'connected' : 'disconnected');
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
+      document.getElementById(tab + 'Tab').classList.add('active');
+      if (tab === 'history') loadHistory();
+    }
+
+    function updateUI(status) {
+      const modeIndicator = document.getElementById('modeIndicator');
+      document.getElementById('modeText').textContent = capitalize(status.mode) + ' Mode';
+      modeIndicator.className = 'mode-indicator ' + status.mode;
+
+      updateStatusBadges(status.dailyStatus, status);
+      populateMessDropdowns(status.messes);
+      // Update multi-select with current preferences (now arrays)
+      updateMultiSelectValue('lunchPreference', status.lunchPreference || []);
+      updateMultiSelectValue('dinnerPreference', status.dinnerPreference || []);
+      updateActionCard(status);
+      updateConversations(status.activeConversations);
+      loadTodayDeals();
+    }
+
+    function updateStatusBadges(statusText, status) {
+      const lunchMatch = statusText.match(/Lunch:\s*(\w+)/);
+      const dinnerMatch = statusText.match(/Dinner:\s*(\w+)/);
+      if (lunchMatch) {
+        const badge = document.getElementById('lunchStatus');
+        const toggleBtn = document.getElementById('lunchToggleBtn');
+        const state = lunchMatch[1].toLowerCase();
+        badge.className = 'status-badge ' + state;
+        badge.textContent = capitalize(state);
+        // Update toggle button based on bought status
+        const isBought = status?.lunchBought || state === 'bought';
+        toggleBtn.textContent = isBought ? 'Reset' : 'Mark Bought';
+        toggleBtn.className = 'toggle-btn ' + (isBought ? 'reset' : 'mark-bought');
+      }
+      if (dinnerMatch) {
+        const badge = document.getElementById('dinnerStatus');
+        const toggleBtn = document.getElementById('dinnerToggleBtn');
+        const state = dinnerMatch[1].toLowerCase();
+        badge.className = 'status-badge ' + state;
+        badge.textContent = capitalize(state);
+        // Update toggle button based on bought status
+        const isBought = status?.dinnerBought || state === 'bought';
+        toggleBtn.textContent = isBought ? 'Reset' : 'Mark Bought';
+        toggleBtn.className = 'toggle-btn ' + (isBought ? 'reset' : 'mark-bought');
+      }
+    }
+
+    // Multi-select state tracking
+    const multiSelectState = {
+      lunchPreference: [],
+      dinnerPreference: []
+    };
+
+    function populateMessDropdowns(messes) {
+      if (!messes) return;
+      ['lunchPreference', 'dinnerPreference'].forEach(id => {
+        const container = document.getElementById(id);
+        const dropdown = container.querySelector('.multi-select-dropdown');
+        dropdown.innerHTML = messes.map(m =>
+          `<div class="multi-select-option" data-value="${m}" onclick="toggleMultiSelectOption('${id}', '${m}')">
+            <div class="multi-select-checkbox"></div>
+            <span>${m}</span>
+          </div>`
+        ).join('');
+      });
+    }
+
+    function toggleMultiSelect(id) {
+      const container = document.getElementById(id);
+      const statusCard = document.getElementById('statusCard');
+      // Close other dropdowns
+      document.querySelectorAll('.multi-select.open').forEach(el => {
+        if (el.id !== id) el.classList.remove('open');
+      });
+      container.classList.toggle('open');
+      // Toggle card z-index when any dropdown is open
+      const anyOpen = document.querySelectorAll('.multi-select.open').length > 0;
+      statusCard.classList.toggle('dropdown-open', anyOpen);
+    }
+
+    function toggleMultiSelectOption(id, value) {
+      const selected = multiSelectState[id];
+      const index = selected.indexOf(value);
+      if (index === -1) {
+        selected.push(value);
+      } else {
+        selected.splice(index, 1);
+      }
+      updateMultiSelectUI(id);
+      setPreference(document.getElementById(id).dataset.type, selected);
+      event.stopPropagation();
+    }
+
+    function removeFromMultiSelect(id, value) {
+      const selected = multiSelectState[id];
+      const index = selected.indexOf(value);
+      if (index !== -1) {
+        selected.splice(index, 1);
+      }
+      updateMultiSelectUI(id);
+      setPreference(document.getElementById(id).dataset.type, selected);
+      event.stopPropagation();
+    }
+
+    function updateMultiSelectUI(id) {
+      const container = document.getElementById(id);
+      const trigger = container.querySelector('.multi-select-trigger');
+      const selected = multiSelectState[id];
+
+      // Update trigger display
+      if (selected.length === 0) {
+        trigger.innerHTML = '<span class="multi-select-placeholder">Any Mess</span>';
+      } else {
+        trigger.innerHTML = selected.map(v =>
+          `<span class="selected-tag">${v}<span class="remove" onclick="removeFromMultiSelect('${id}', '${v}')">&times;</span></span>`
+        ).join('');
+      }
+
+      // Update dropdown options
+      container.querySelectorAll('.multi-select-option').forEach(opt => {
+        const val = opt.dataset.value;
+        if (selected.includes(val)) {
+          opt.classList.add('selected');
+        } else {
+          opt.classList.remove('selected');
+        }
+      });
+    }
+
+    function updateMultiSelectValue(id, values) {
+      multiSelectState[id] = Array.isArray(values) ? [...values] : [];
+      updateMultiSelectUI(id);
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.multi-select')) {
+        document.querySelectorAll('.multi-select.open').forEach(el => el.classList.remove('open'));
+        const statusCard = document.getElementById('statusCard');
+        if (statusCard) statusCard.classList.remove('dropdown-open');
+      }
+    });
+
+    function updateActionCard(status) {
+      const card = document.getElementById('actionCard');
+      const pending = status.pendingConfirmation || status.pendingPayment;
+      if (pending) {
+        card.classList.remove('hidden');
+        document.getElementById('actionSeller').textContent = pending.sellerName;
+        document.getElementById('actionType').textContent = pending.couponType.toUpperCase();
+        document.getElementById('actionAmount').textContent = '₹' + pending.price;
+        document.getElementById('actionUpi').textContent = pending.upiId || '-';
+        document.getElementById('confirmButtons').classList.toggle('hidden', !!status.pendingPayment);
+        document.getElementById('paymentButtons').classList.toggle('hidden', !status.pendingPayment);
+        document.getElementById('actionDescription').textContent = status.pendingPayment ? 'Complete payment and confirm.' : 'A seller is ready.';
+      } else {
+        card.classList.add('hidden');
+      }
+    }
+
+    function updateConversations(conversations) {
+      const container = document.getElementById('conversationList');
+
+      // Get current conversation map for easy lookup
+      const currentConvMap = new Map((conversations || []).map(c => [c.id, c]));
+
+      // Detect state transitions (active -> completed/failed)
+      for (const conv of (conversations || [])) {
+        const prev = previousConversations.get(conv.id);
+        const isNowFinished = conv.state === 'COMPLETED' || conv.state === 'FAILED';
+        const wasActive = prev && prev.state !== 'COMPLETED' && prev.state !== 'FAILED';
+
+        if (isNowFinished && wasActive) {
+          console.log('🎬 Conversation just finished:', conv.id, conv.state);
+          // Show toast for state transition
+          if (conv.state === 'COMPLETED') {
+            showToast('success', '🎉 Success!', `Coupon secured from ${conv.sellerName}!`);
+          } else {
+            showToast('error', 'Deal Failed', `${conv.couponType} deal with ${conv.sellerName} failed`);
+          }
+          // Close the chat dropdown
+          openChats.delete(conv.id);
+          // Schedule removal after animation
+          setTimeout(() => {
+            const el = document.querySelector(`[data-conv-id="${conv.id}"]`);
+            if (el) {
+              el.classList.add('fading-out');
+              setTimeout(() => el.remove(), 500);
+            }
+          }, 10000);
+        }
+      }
+
+      // Detect new conversations and auto-open them
+      for (const conv of (conversations || [])) {
+        const isFinished = conv.state === 'COMPLETED' || conv.state === 'FAILED';
+        if (!previousConversations.has(conv.id) && !isFinished) {
+          // New active conversation - auto open
+          openChats.add(conv.id);
+        }
+      }
+
+      // Update previous conversations map
+      previousConversations.clear();
+      for (const conv of (conversations || [])) {
+        previousConversations.set(conv.id, { ...conv });
+      }
+
+      // Check for finished conversations that should show animations
+      const finishedConvs = (conversations || []).filter(c => c.state === 'COMPLETED' || c.state === 'FAILED');
+      const activeConvs = (conversations || []).filter(c => c.state !== 'COMPLETED' && c.state !== 'FAILED');
+
+      // If no conversations at all
+      if (!conversations || !conversations.length) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">💬</div><div class="text">No active conversations</div></div>';
+        openChats.clear();
+        return;
+      }
+
+      // Build HTML - show finished conversations with animations, then active ones
+      let html = '';
+
+      // Finished conversations first (with animation)
+      html += finishedConvs.map(c => createConversationHTML(c)).join('');
+
+      // Active conversations
+      html += activeConvs.map(c => createConversationHTML(c)).join('');
+
+      if (html === '') {
+        html = '<div class="empty-state"><div class="icon">💬</div><div class="text">No active conversations</div></div>';
+      }
+
+      container.innerHTML = html;
+
+      // Reload messages for open chats (only active ones)
+      for (const convId of openChats) {
+        if (currentConvMap.has(convId)) {
+          const conv = currentConvMap.get(convId);
+          if (conv.state !== 'COMPLETED' && conv.state !== 'FAILED') {
+            loadChatMessages(convId);
+          }
+        }
+      }
+    }
+
+    function createConversationHTML(c) {
+      const isOpen = openChats.has(c.id);
+      const isCompleted = c.state === 'COMPLETED';
+      const isFailed = c.state === 'FAILED';
+      const isFinished = isCompleted || isFailed;
+
+      // For completed/failed conversations, show the result animation
+      if (isFinished) {
+        const result = isCompleted ? 'success' : 'failed';
+        return `
+          <div class="conversation-item" data-conv-id="${c.id}" data-finished="true">
+            <div class="conversation-header">
+              <span class="conversation-seller">${c.sellerName}</span>
+              <span class="conversation-state ${isCompleted ? 'payment' : 'awaiting'}" style="animation: ${isCompleted ? 'successBadge' : 'failBadge'} 0.5s ease;">${isCompleted ? 'COMPLETED' : 'FAILED'}</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-tertiary)">${c.couponType.toUpperCase()} • ₹${c.price}${c.messName ? ' • ' + c.messName : ''}</div>
+            <div class="chat-result ${result}">
+              ${isCompleted ? getConfettiHTML() : ''}
+              ${isCompleted ? getSuccessSVG() : getFailedSVG()}
+              <span class="chat-result-text">${isCompleted ? 'Coupon Received!' : 'Deal Failed'}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="conversation-item" data-conv-id="${c.id}">
+          <div class="conversation-header">
+            <span class="conversation-seller">${c.sellerName}</span>
+            <span class="conversation-state ${c.state.includes('PAYMENT') ? 'payment' : 'awaiting'}">${c.state.replace(/_/g, ' ')}</span>
+          </div>
+          <div style="font-size: 13px; color: var(--text-tertiary)">${c.couponType.toUpperCase()} • ₹${c.price}${c.messName ? ' • ' + c.messName : ''}</div>
+          <div class="conversation-actions" style="display: flex; gap: 8px; margin-top: 10px;">
+            <button class="conv-action-btn complete" onclick="manualComplete('${c.id}')" title="Mark as successful deal">✓ Complete</button>
+            <button class="conv-action-btn fail" onclick="manualFail('${c.id}')" title="Cancel this deal">✕ Cancel</button>
+          </div>
+          <button class="chat-toggle ${isOpen ? 'open' : ''}" onclick="toggleChat('${c.id}', this)">
+            <span class="arrow">▼</span> View Chat
+          </button>
+          <div class="chat-container ${isOpen ? 'open' : ''}" id="chat-${c.id}">
+            <div class="chat-messages" id="messages-${c.id}">
+              <div class="chat-empty">Loading messages...</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Success checkmark SVG
+    function getSuccessSVG() {
+      return `
+        <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+          <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <path class="checkmark-check" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M14 27l7 7 16-16"/>
+        </svg>
+      `;
+    }
+
+    // Failed cross SVG
+    function getFailedSVG() {
+      return `
+        <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+          <circle class="cross-circle" cx="26" cy="26" r="25" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <path class="cross-line" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" d="M16 16l20 20"/>
+          <path class="cross-line" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" d="M36 16l-20 20"/>
+        </svg>
+      `;
+    }
+
+    // Generate confetti HTML
+    function getConfettiHTML() {
+      const colors = ['#30D158', '#5AC8FA', '#FFD60A', '#FF9F0A', '#BF5AF2', '#FF375F'];
+      let confetti = '<div class="confetti-container">';
+      for (let i = 0; i < 20; i++) {
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const left = Math.random() * 100;
+        const delay = Math.random() * 0.5;
+        const size = 6 + Math.random() * 6;
+        confetti += `<div class="confetti" style="left: ${left}%; background: ${color}; width: ${size}px; height: ${size}px; animation-delay: ${delay}s;"></div>`;
+      }
+      confetti += '</div>';
+      return confetti;
+    }
+
+    // Toggle chat dropdown and load messages
+    async function toggleChat(convId, btn) {
+      const container = document.getElementById('chat-' + convId);
+      const isOpen = container.classList.contains('open');
+
+      if (isOpen) {
+        closeChat(convId, btn);
+      } else {
+        container.classList.add('open');
+        btn.classList.add('open');
+        openChats.add(convId); // Track open state
+        await loadChatMessages(convId);
+      }
+    }
+
+    // Smoothly close a chat with animation
+    function closeChat(convId, btn) {
+      const container = document.getElementById('chat-' + convId);
+      if (!container) return;
+
+      container.classList.add('closing');
+      container.classList.remove('open');
+      if (btn) btn.classList.remove('open');
+      openChats.delete(convId);
+
+      // Remove closing class after animation
+      setTimeout(() => {
+        if (container) container.classList.remove('closing');
+      }, 400);
+    }
+
+    // Load chat messages for a conversation
+    async function loadChatMessages(convId) {
+      const messagesContainer = document.getElementById('messages-' + convId);
+      try {
+        const res = await fetch('/api/conversation/' + convId + '/messages');
+        const data = await res.json();
+
+        if (!data.messages || data.messages.length === 0) {
+          messagesContainer.innerHTML = '<div class="chat-empty">No messages yet</div>';
+          return;
+        }
+
+        messagesContainer.innerHTML = data.messages.map(m => {
+          const time = new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+          const text = m.hasMedia ? (m.text || '[Image]') : m.text;
+          return `
+            <div class="chat-message ${m.sender}">
+              <div class="text">${escapeHtml(text)}</div>
+              <div class="time">${time}</div>
+            </div>
+          `;
+        }).join('');
+
+        // Scroll to bottom
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+        messagesContainer.innerHTML = '<div class="chat-empty">Failed to load messages</div>';
+      }
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function loadTodayDeals() {
+      try {
+        const res = await fetch('/api/history/today');
+        const data = await res.json();
+        renderDeals(data.deals, 'todayDeals', true);
+      } catch (e) { console.error(e); }
+    }
+
+    async function loadHistory() {
+      try {
+        const [histRes, statsRes] = await Promise.all([fetch('/api/history?days=30'), fetch('/api/history/stats?days=30')]);
+        const histData = await histRes.json();
+        const statsData = await statsRes.json();
+
+        document.getElementById('statSuccess').textContent = statsData.successfulDeals;
+        document.getElementById('statFailed').textContent = statsData.failedDeals;
+        document.getElementById('statSpent').textContent = '₹' + statsData.totalSpent;
+
+        renderDeals(histData.deals, 'historyList', false);
+      } catch (e) { console.error(e); }
+    }
+
+    function renderDeals(deals, containerId, isToday) {
+      const container = document.getElementById(containerId);
+      if (!deals || !deals.length) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">${isToday ? '🎫' : '📜'}</div><div class="text">${isToday ? 'No deals today' : 'No history yet'}</div></div>`;
+        return;
+      }
+      container.innerHTML = deals.map(d => {
+        const date = new Date(d.timestamp);
+        const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const dateStr = date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+        const iconClass = d.status === 'success' ? d.couponType : 'failed';
+        const icon = d.status === 'success' ? (d.couponType === 'lunch' ? '☀️' : '🌙') : '❌';
+        return `
+          <div class="history-item" onclick="${d.status === 'success' && d.couponImagePath ? `openModal('${d.id}', '${d.couponType}', '${d.sellerName}', '${d.messName || '-'}', '${d.price}', '${dateStr} ${timeStr}', '${d.couponImagePath}')` : ''}">
+            <div class="history-icon ${iconClass}">${icon}</div>
+            <div class="history-details">
+              <div class="title">${capitalize(d.couponType)} Coupon</div>
+              <div class="meta">${d.sellerName} • ${isToday ? timeStr : dateStr + ' ' + timeStr}${d.messName ? ' • ' + d.messName : ''}</div>
+            </div>
+            <span class="history-status ${d.status}">${d.status === 'success' ? '✓ Success' : '✕ Failed'}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openModal(id, type, seller, mess, price, date, imagePath) {
+      document.getElementById('modalImage').src = '/coupons/' + imagePath;
+      document.getElementById('modalType').textContent = capitalize(type);
+      document.getElementById('modalSeller').textContent = seller;
+      document.getElementById('modalMess').textContent = mess;
+      document.getElementById('modalAmount').textContent = '₹' + price;
+      document.getElementById('modalDate').textContent = date;
+      document.getElementById('couponModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('couponModal').classList.remove('active');
+    }
+
+    function addLog(level, message) {
+      const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      logs.unshift({ level, message, time });
+      if (logs.length > MAX_LOGS) logs.pop();
+      const container = document.getElementById('logContainer');
+      container.innerHTML = logs.map(l => `
+        <div class="log-entry"><span class="time">${l.time}</span><span class="message">${l.message}</span></div>
+      `).join('');
+    }
+
+    function showToast(type, title, message) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast ' + type;
+      toast.innerHTML = `<span class="icon">${icons[type] || 'ℹ'}</span><div><div class="title">${title}</div><div class="message">${message}</div></div>`;
+      container.appendChild(toast);
+      setTimeout(() => { toast.style.animation = 'slideIn 0.3s ease reverse'; setTimeout(() => toast.remove(), 300); }, 4000);
+    }
+
+    function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+    async function startSession() {
+      const res = await fetch('/api/start', { method: 'POST' });
+      const data = await res.json();
+      showToast(data.startedSession ? 'success' : 'warning', data.startedSession ? 'Started' : 'No Session', data.startedSession ? `Looking for ${data.startedSession}` : 'No session to start');
+    }
+
+    async function stopSession() {
+      const res = await fetch('/api/stop', { method: 'POST' });
+      const data = await res.json();
+      showToast(data.stoppedSession ? 'info' : 'warning', data.stoppedSession ? 'Stopped' : 'No Session', data.stoppedSession ? `${capitalize(data.stoppedSession)} paused` : 'No session to stop');
+    }
+
+    async function setPreference(type, messNames) {
+      const names = Array.isArray(messNames) ? messNames : (messNames ? [messNames] : []);
+      await fetch('/api/preference', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, messNames: names.length > 0 ? names : null }) });
+      const displayText = names.length > 0 ? names.join(', ') : 'Any';
+      showToast('success', 'Updated', `${capitalize(type)}: ${displayText}`);
+    }
+
+    async function confirmPurchase() { await fetch('/api/confirm', { method: 'POST' }); showToast('success', 'Confirmed', 'Proceeding...'); }
+    async function declinePurchase() { await fetch('/api/decline', { method: 'POST' }); showToast('info', 'Declined', 'Looking for others...'); }
+    async function confirmPayment() { await fetch('/api/paid', { method: 'POST' }); showToast('success', 'Payment Done', 'Waiting for coupon...'); }
+
+    async function manualComplete(convId) {
+      if (!confirm('Mark this deal as completed (successful)? This will record it as a successful purchase.')) return;
+      try {
+        const res = await fetch(`/api/conversation/${convId}/complete`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('success', 'Completed', 'Deal marked as successful');
+        } else {
+          showToast('error', 'Error', data.error || 'Failed to complete');
+        }
+      } catch (error) {
+        showToast('error', 'Error', 'Network error');
+      }
+    }
+
+    async function manualFail(convId) {
+      if (!confirm('Cancel this deal? This will mark it as failed and notify the seller.')) return;
+      try {
+        const res = await fetch(`/api/conversation/${convId}/fail`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'Manually cancelled by user' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('info', 'Cancelled', 'Deal cancelled');
+        } else {
+          showToast('error', 'Error', data.error || 'Failed to cancel');
+        }
+      } catch (error) {
+        showToast('error', 'Error', 'Network error');
+      }
+    }
+
+    async function toggleSessionStatus(type) {
+      const res = await fetch(`/api/toggle/${type}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        if (data.newStatus === 'needed') {
+          showToast('info', 'Reset', `${capitalize(type)} reset to needed`);
+        } else {
+          showToast('success', 'Marked', `${capitalize(type)} marked as bought`);
+        }
+      } else {
+        showToast('error', 'Error', data.error || 'Failed to toggle status');
+      }
+    }
+
+    // Initial load - check auth first
+    checkAuthStatus();
+    fetch('/api/status').then(r => r.json()).then(status => { if (isLoggedIn) updateUI(status); }).catch(console.error);
+    setInterval(() => {
+      if (isLoggedIn) {
+        fetch('/api/status').then(r => r.json()).then(updateUI).catch(() => {});
+      }
+    }, 5000);
+
+    // Keyboard shortcut to close modal
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  </script>
+</body>
+</html>

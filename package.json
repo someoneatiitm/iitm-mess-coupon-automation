@@ -1,0 +1,45 @@
+{
+  "name": "iitm-mess-coupon-automation",
+  "version": "1.0.0",
+  "description": "WhatsApp automation for buying mess coupons",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && cp -r src/web/public dist/web/ && mkdir -p dist/database && cp src/database/schema.sql dist/database/",
+    "start": "tsx src/index.ts",
+    "test-mode": "tsx src/index.ts test",
+    "real-mode": "tsx src/index.ts real",
+    "dev": "tsx watch src/index.ts",
+    "prod": "npm run build && node dist/index.js",
+    "deploy": "./deploy/deploy.sh"
+  },
+  "keywords": [
+    "whatsapp",
+    "automation",
+    "mess",
+    "coupon"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "groq-sdk": "^0.8.0",
+    "jimp": "^1.1.4",
+    "jsqr": "^1.4.0",
+    "node-notifier": "^10.0.1",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.8.3",
+    "whatsapp-web.js": "^1.26.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.11.0",
+    "@types/node-notifier": "^8.0.5",
+    "@types/qrcode-terminal": "^0.12.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "groups": [
+    "Buy & Sell @ IIT Madras - 1",
+    "Buy & Sell @ IIT Madras - 2",
+    "Buy & Sell @ IIT Madras - 3",
+    "Buy & Sell @ IIT Madras - 4",
+    "Buy & Sell @ IIT Madras - 5",
+    "Buy & Sell @ IIT Madras - 6",
+    "Buy & Sell @ IIT Madras - 7",
+    "Buy & Sell @ IIT Madras - 8",
+    "Buy & Sell @ IIT Madras - 9",
+    "Buy & Sell @ IIT Madras - 10"
+  ],
+  "testPhoneNumbers": [
+    "YOUR_TEST_PHONE_NUMBER"
+  ],
+  "myPhoneNumber": "YOUR_PHONE_NUMBER",
+  "maxPrice": 70,
+  "messageDelayMs": 2000,
+  "notificationSound": true
+}

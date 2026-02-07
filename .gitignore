@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files (contains secrets)
+.env
+
+# WhatsApp session data (contains auth tokens)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Runtime data
+data/
+
+# Database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Migrated JSON files
+*.json.migrated
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# User-specific config (use config.example.json as template)
+config/config.json

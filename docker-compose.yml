@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  mess-coupon-bot:
+    build: .
+    container_name: mess-coupon-bot
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist WhatsApp session
+      - ./.wwebjs_auth:/app/.wwebjs_auth
+      # Persist bot data (history, state, coupons)
+      - ./data:/app/data
+      # Config file
+      - ./config:/app/config
+    environment:
+      - NODE_ENV=production
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - WEB_PORT=3000
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

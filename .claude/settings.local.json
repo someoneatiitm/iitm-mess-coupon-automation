@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(timeout 5 npm start:*)",
+      "Bash(npm start)",
+      "Bash(npm run build:*)",
+      "Bash(chmod:*)"
+    ]
+  }
+}
