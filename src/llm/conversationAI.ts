@@ -132,8 +132,8 @@ export async function generateAskUpiMessage(): Promise<string> {
 }
 
 export async function generateDeclineMessage(reason?: string): Promise<string> {
-  const task = `Politely decline because ${reason || 'price is more than Rs.70'}. Keep it brief and not rude. Just say you can only do 70 max.`;
-  return generateMessage(task, 60);
+  const task = `Politely decline the coupon deal because ${reason || 'the price is more than what you can afford'}. Don't try to negotiate or counter-offer. Instead, gracefully back out - tell them they're free to go ahead and sell it to someone else, and you'll find another one. Sound casual and friendly, not disappointed. Something like "ah that's a bit much for me, go ahead and sell to someone else - I'll find another one" or "no worries, that's above my budget, feel free to sell to others". Keep it brief and natural.`;
+  return generateMessage(task, 80);
 }
 
 export async function generatePaymentConfirmation(upiId: string, amount: number): Promise<string> {

@@ -10,6 +10,7 @@ let isReady = false;
 let currentQR: string | null = null;
 let currentUserPhone: string | null = null;
 let storedMessageHandler: MessageHandler | null = null;
+let currentPairingCode: string | null = null;
 
 // Event callbacks for web integration
 let onQRCallback: ((qr: string) => void) | null = null;
@@ -17,6 +18,7 @@ let onAuthenticatedCallback: (() => void) | null = null;
 let onReadyCallback: ((userPhone: string) => void) | null = null;
 let onDisconnectedCallback: ((reason: string) => void) | null = null;
 let onAuthFailureCallback: ((msg: string) => void) | null = null;
+let onPairingCodeCallback: ((code: string) => void) | null = null;
 
 export type MessageHandler = (message: pkg.Message) => Promise<void>;
 
@@ -27,12 +29,14 @@ export function setEventCallbacks(callbacks: {
   onReady?: (userPhone: string) => void;
   onDisconnected?: (reason: string) => void;
   onAuthFailure?: (msg: string) => void;
+  onPairingCode?: (code: string) => void;
 }): void {
   onQRCallback = callbacks.onQR || null;
   onAuthenticatedCallback = callbacks.onAuthenticated || null;
   onReadyCallback = callbacks.onReady || null;
   onDisconnectedCallback = callbacks.onDisconnected || null;
   onAuthFailureCallback = callbacks.onAuthFailure || null;
+  onPairingCodeCallback = callbacks.onPairingCode || null;
 }
 
 // Get current auth state
@@ -41,12 +45,14 @@ export function getAuthState(): {
   isReady: boolean;
   currentQR: string | null;
   userPhone: string | null;
+  pairingCode: string | null;
 } {
   return {
     isAuthenticated,
     isReady,
     currentQR: isReady ? null : currentQR,  // Don't expose QR if already logged in
-    userPhone: currentUserPhone
+    userPhone: currentUserPhone,
+    pairingCode: isReady ? null : currentPairingCode
   };
 }
 
@@ -65,6 +71,7 @@ export async function initWhatsAppClient(onMessage: MessageHandler): Promise<pkg
   isReady = false;
   currentQR = null;
   currentUserPhone = null;
+  currentPairingCode = null;
 
   whatsappClient = new Client({
     authStrategy: new LocalAuth({
@@ -196,6 +203,7 @@ export async function logout(): Promise<void> {
   isReady = false;
   currentQR = null;
   currentUserPhone = null;
+  currentPairingCode = null;
 
   logger.info('Logout complete');
 }
@@ -225,6 +233,81 @@ export async function reinitializeClient(onReady?: () => void): Promise<pkg.Clie
 
   // Reinitialize with stored handler
   return await initWhatsAppClient(storedMessageHandler);
+}
+
+// Request pairing code for phone number login
+export async function requestPairingCode(phoneNumber: string): Promise<string | null> {
+  if (!whatsappClient) {
+    logger.error('Cannot request pairing code - WhatsApp client not initialized');
+    return null;
+  }
+
+  if (isReady) {
+    logger.warn('Cannot request pairing code - already logged in');
+    return null;
+  }
+
+  try {
+    // Clean the phone number - remove +, spaces, dashes, and ensure only digits
+    const cleanPhone = phoneNumber.replace(/[^\d]/g, '');
+
+    if (cleanPhone.length < 10) {
+      logger.error('Phone number too short', { length: cleanPhone.length });
+      return null;
+    }
+
+    logger.info('Requesting pairing code for phone number', { phone: cleanPhone.substring(0, 5) + '****' });
+
+    // Check if requestPairingCode method exists
+    if (typeof whatsappClient.requestPairingCode !== 'function') {
+      logger.error('requestPairingCode method not available on this WhatsApp client version');
+      return null;
+    }
+
+    // Get the puppeteer page to inject the missing callback
+    const page = (whatsappClient as any).pupPage;
+    if (!page) {
+      logger.error('Cannot access puppeteer page for pairing code');
+      return null;
+    }
+
+    logger.info('Setting up pairing code callback...');
+
+    // Inject the missing onCodeReceivedEvent function
+    await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const win = globalThis as any;
+      win.onCodeReceivedEvent = (code: string) => code;
+    });
+
+    // Request the pairing code from WhatsApp
+    logger.info('Calling requestPairingCode...');
+
+    try {
+      // Call with showNotification=true to get a notification on the phone
+      const code = await whatsappClient.requestPairingCode(cleanPhone, true);
+
+      if (code) {
+        currentPairingCode = code;
+        logger.info('Pairing code received successfully', { code });
+
+        // Notify web frontend
+        if (onPairingCodeCallback) onPairingCodeCallback(code);
+
+        return code;
+      }
+
+      logger.warn('No pairing code returned');
+      return null;
+    } catch (innerError) {
+      logger.error('requestPairingCode threw error', { error: innerError });
+      throw innerError;
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to request pairing code', { error: errorMsg });
+    return null;
+  }
 }
 
 // Check if client is ready

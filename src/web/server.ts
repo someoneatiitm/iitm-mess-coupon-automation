@@ -7,18 +7,21 @@ import { logger } from '../utils/logger.js';
 import { DailyTracker } from '../state/dailyTracker.js';
 import { Conversation, CouponType, IITM_MESSES } from '../conversation/types.js';
 import { getHistory, getTodayDeals, getStats, COUPONS_DIRECTORY, DealRecord } from '../state/history.js';
-import { getAuthState, logout, isClientReady, setEventCallbacks } from '../whatsapp/client.js';
+import { getAuthState, logout, isClientReady, setEventCallbacks, requestPairingCode } from '../whatsapp/client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export interface WebServerCallbacks {
   onStartSession: () => { startedSession: CouponType | null };
   onStopSession: () => { stoppedSession: CouponType | null; nextSession: CouponType | null };
+  onPauseSession: (type: CouponType) => { success: boolean; paused: boolean };
+  onResumeSession: (type: CouponType) => { success: boolean; paused: boolean };
   onSetPreference: (type: CouponType, messNames: string[] | null) => void;
   onConfirmPurchase: () => void;
   onDeclinePurchase: () => void;
   onConfirmPayment: () => void;
   onToggleSessionStatus: (type: CouponType) => { newStatus: 'bought' | 'needed' };
+  onSetBotActive: (active: boolean) => { success: boolean; error?: string };
   onLogout: () => Promise<void>;
   onRestart: () => Promise<void>;
   onManualComplete: (conversationId: string) => Promise<{ success: boolean; error?: string }>;
@@ -33,6 +36,7 @@ export interface WebServerCallbacks {
     dinnerPaused: boolean;
     lunchBought: boolean;
     dinnerBought: boolean;
+    botActive: boolean;
   };
   getActiveConversations: () => Conversation[];
   getPendingConfirmation: () => { convId: string | null; conversation: Conversation | null };
@@ -96,6 +100,29 @@ export class WebServer {
       res.json(result);
     });
 
+    // Pause/Resume specific session (lunch or dinner)
+    this.app.post('/api/session/:type/pause', (req: Request, res: Response) => {
+      const type = req.params.type as CouponType;
+      if (type !== 'lunch' && type !== 'dinner') {
+        res.status(400).json({ error: 'Invalid type. Must be lunch or dinner.' });
+        return;
+      }
+      const result = this.callbacks.onPauseSession(type);
+      this.broadcastStatus();
+      res.json(result);
+    });
+
+    this.app.post('/api/session/:type/resume', (req: Request, res: Response) => {
+      const type = req.params.type as CouponType;
+      if (type !== 'lunch' && type !== 'dinner') {
+        res.status(400).json({ error: 'Invalid type. Must be lunch or dinner.' });
+        return;
+      }
+      const result = this.callbacks.onResumeSession(type);
+      this.broadcastStatus();
+      res.json(result);
+    });
+
     this.app.post('/api/preference', (req: Request, res: Response) => {
       const { type, messNames } = req.body;
       if (!type || (type !== 'lunch' && type !== 'dinner')) {
@@ -136,6 +163,18 @@ export class WebServer {
       const result = this.callbacks.onToggleSessionStatus(type);
       this.broadcastStatus();
       res.json({ success: true, type, newStatus: result.newStatus });
+    });
+
+    // Bot active ON/OFF switch
+    this.app.post('/api/bot-active', (req: Request, res: Response) => {
+      const { active } = req.body;
+      if (typeof active !== 'boolean') {
+        res.status(400).json({ error: 'Invalid active value. Must be boolean.' });
+        return;
+      }
+      const result = this.callbacks.onSetBotActive(active);
+      this.broadcastStatus();
+      res.json(result);
     });
 
     // History API endpoints
@@ -240,6 +279,37 @@ export class WebServer {
       }
     });
 
+    // Request pairing code for phone number login
+    this.app.post('/api/auth/pairing-code', async (req: Request, res: Response) => {
+      try {
+        const { phoneNumber } = req.body;
+        if (!phoneNumber) {
+          res.status(400).json({ success: false, error: 'Phone number is required' });
+          return;
+        }
+
+        // Check if already logged in
+        const authState = getAuthState();
+        if (authState.isReady) {
+          res.status(400).json({ success: false, error: 'Already logged in. Logout first to use phone login.' });
+          return;
+        }
+
+        logger.info('Pairing code requested', { phone: phoneNumber.substring(0, 5) + '****' });
+        const code = await requestPairingCode(phoneNumber);
+
+        if (code) {
+          res.json({ success: true, code });
+        } else {
+          res.status(500).json({ success: false, error: 'Failed to get pairing code. Try using QR code instead, or check the phone number format (91XXXXXXXXXX).' });
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Pairing code request failed', { error: errorMsg });
+        res.status(500).json({ success: false, error: `Failed: ${errorMsg}. Try QR code instead.` });
+      }
+    });
+
     // Serve index.html for root
     this.app.get('/', (_req: Request, res: Response) => {
       res.sendFile(join(__dirname, 'public', 'index.html'));
@@ -312,6 +382,10 @@ export class WebServer {
         logger.info('Broadcasting auth failure');
         this.io.emit('auth', { isLoggedIn: false, hasQR: false, error: msg });
         this.broadcastNotification('error', 'Auth Failed', msg);
+      },
+      onPairingCode: (code) => {
+        logger.info('Broadcasting pairing code to web clients');
+        this.io.emit('pairingCode', { code });
       }
     });
   }

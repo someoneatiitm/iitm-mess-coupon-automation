@@ -3,7 +3,7 @@ import { CouponType } from '../conversation/types.js';
 import { logger } from '../utils/logger.js';
 
 const SELL_DETECTION_PROMPT = `You are a message classifier for a mess coupon exchange system.
-Analyze the WhatsApp message and determine if the SENDER THEMSELVES is OFFERING TO SELL a mess coupon (lunch or dinner).
+Analyze the WhatsApp message and determine if the SENDER THEMSELVES is OFFERING TO SELL a mess coupon (ONLY lunch or dinner).
 
 CRITICAL DISTINCTION - READ CAREFULLY:
 - "selling lunch coupon" / "I have a coupon for sale" / "extra coupon available" = SELLING (isSelling: true)
@@ -13,21 +13,32 @@ CRITICAL DISTINCTION - READ CAREFULLY:
 The message is ONLY considered "selling" if the sender is OFFERING their own coupon for sale.
 If the sender is ASKING whether others are selling, they are a BUYER, not a seller.
 
-EXAMPLES:
-- "lunch coupon selling 50rs" → isSelling: true (offering to sell)
-- "anyone selling dinner coupon?" → isSelling: false (asking to buy)
-- "is someone selling lunch?" → isSelling: false (asking to buy)
-- "extra dinner coupon available" → isSelling: true (offering to sell)
-- "koi lunch coupon bech raha?" → isSelling: false (asking if anyone is selling = wants to buy)
-- "selling dinner coupon dm" → isSelling: true (offering to sell)
-- "need lunch coupon" → isSelling: false (wants to buy)
+VERY IMPORTANT - ONLY LUNCH AND DINNER:
+- We ONLY care about LUNCH and DINNER coupons
+- IGNORE and REJECT messages about BREAKFAST coupons → isSelling: false
+- IGNORE and REJECT messages about SNACKS coupons → isSelling: false
+- IGNORE and REJECT messages about MORNING MESS / MORNING COUPON → isSelling: false
+- IGNORE and REJECT messages about EVENING SNACKS → isSelling: false
+- If the message says "breakfast", "snacks", "morning mess", "evening snacks", "nashta" → isSelling: false, couponType: null
+- If the coupon type is unclear and could be breakfast or snacks, set isSelling: false
 
-Determine if it's for lunch or dinner based on context.
+EXAMPLES:
+- "lunch coupon selling 50rs" → isSelling: true, couponType: "lunch"
+- "anyone selling dinner coupon?" → isSelling: false (asking to buy)
+- "selling breakfast coupon" → isSelling: false, couponType: null (BREAKFAST - NOT SUPPORTED)
+- "snacks coupon available 30rs" → isSelling: false, couponType: null (SNACKS - NOT SUPPORTED)
+- "extra dinner coupon available" → isSelling: true, couponType: "dinner"
+- "selling morning mess coupon" → isSelling: false, couponType: null (BREAKFAST - NOT SUPPORTED)
+- "koi lunch coupon bech raha?" → isSelling: false (asking if anyone is selling = wants to buy)
+- "selling dinner coupon dm" → isSelling: true, couponType: "dinner"
+- "need lunch coupon" → isSelling: false (wants to buy)
+- "nashta coupon selling" → isSelling: false, couponType: null (BREAKFAST - NOT SUPPORTED)
+- "evening snacks coupon for sale" → isSelling: false, couponType: null (SNACKS - NOT SUPPORTED)
 
 Respond ONLY with a JSON object in this exact format:
 {"isSelling": true/false, "couponType": "lunch"/"dinner"/null, "confidence": 0.0-1.0}
 
-If the person is asking if others are selling (buyer), or unclear, respond: {"isSelling": false, "couponType": null, "confidence": 0.0}`;
+If the person is asking if others are selling (buyer), or unclear, or selling BREAKFAST/SNACKS, respond: {"isSelling": false, "couponType": null, "confidence": 0.0}`;
 
 const CANCELLATION_DETECTION_PROMPT = `You are detecting if a buyer is cancelling a coupon deal.
 Analyze the message and determine if they are saying they no longer want to buy.
@@ -145,7 +156,28 @@ const AGREEMENT_PATTERNS = [
   'haan', 'ha', 'theek', 'thik', 'available', 'hai', 'yes available'
 ];
 
+// Keywords that indicate breakfast or snacks coupons (NOT supported)
+const BREAKFAST_SNACKS_KEYWORDS = [
+  'breakfast', 'snacks', 'snack', 'nashta', 'morning mess',
+  'morning coupon', 'evening snacks', 'evening snack', 'bf coupon',
+  'bf mess', 'bfast', 'b fast', 'subah', 'snaks'
+];
+
 export async function detectSellMessage(message: string): Promise<SellDetectionResult> {
+  const lowerMessage = message.toLowerCase();
+
+  // Pre-filter: Reject breakfast and snacks messages before LLM call
+  const isBreakfastOrSnacks = BREAKFAST_SNACKS_KEYWORDS.some(kw => lowerMessage.includes(kw));
+  if (isBreakfastOrSnacks) {
+    // Only reject if it doesn't ALSO mention lunch or dinner
+    const mentionsLunch = lowerMessage.includes('lunch');
+    const mentionsDinner = lowerMessage.includes('dinner');
+    if (!mentionsLunch && !mentionsDinner) {
+      logger.info('Rejected breakfast/snacks message (pre-filter)', { message: message.substring(0, 50) });
+      return { isSelling: false, couponType: null, confidence: 0 };
+    }
+  }
+
   try {
     const response = await chatWithRetry(SELL_DETECTION_PROMPT, message);
 
@@ -156,6 +188,25 @@ export async function detectSellMessage(message: string): Promise<SellDetectionR
     }
 
     const result = JSON.parse(jsonMatch[0]) as SellDetectionResult;
+
+    // Post-filter safety: If LLM somehow classified breakfast/snacks as lunch/dinner, reject it
+    if (result.isSelling && isBreakfastOrSnacks && result.couponType) {
+      logger.warn('LLM classified breakfast/snacks message as sell - overriding to reject', {
+        message: message.substring(0, 50),
+        llmResult: result
+      });
+      return { isSelling: false, couponType: null, confidence: 0 };
+    }
+
+    // Also reject if couponType is neither lunch nor dinner (LLM might return something else)
+    if (result.isSelling && result.couponType && result.couponType !== 'lunch' && result.couponType !== 'dinner') {
+      logger.warn('LLM returned unsupported coupon type - rejecting', {
+        couponType: result.couponType,
+        message: message.substring(0, 50)
+      });
+      return { isSelling: false, couponType: null, confidence: 0 };
+    }
+
     logger.debug('Sell detection result', { message: message.substring(0, 50), result });
     return result;
   } catch (error) {

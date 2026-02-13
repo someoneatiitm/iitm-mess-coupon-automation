@@ -1,8 +1,39 @@
 # IITM Mess Coupon Automation
 
+<div align="center">
+
+### 🚀 **Access the Dashboard: [https://tinyurl.com/iitmfoodbot](https://tinyurl.com/iitmfoodbot)**
+
+</div>
+
+---
+
 > **Disclaimer:** This bot is intended for **fair use only** - helping you buy mess coupons from students who genuinely want to sell their unused coupons on unofficial buy & sell groups. It is **not intended for any illegal or unfair practices**. The bot enforces a limit of **1 coupon per session** (lunch and dinner are separate sessions), respecting the mess coupon system. This bot **cannot be used to buy breakfast or snacks coupons** - it only supports lunch and dinner coupons.
 
 A WhatsApp automation bot that monitors IIT Madras buy/sell groups for mess coupon listings, automatically negotiates with sellers, and completes purchases - saving you time and ensuring you never miss a deal.
+
+---
+
+## ⚠️ MANDATORY REQUIREMENT
+
+> **You MUST already be a member of at least one "Buy & Sell @ IIT Madras" WhatsApp group for this bot to work.**
+
+The bot scans messages from these unofficial Buy & Sell groups to find coupon sellers. If you're not in any of these groups, the bot will have nothing to monitor and won't find any coupons.
+
+**How to join:**
+1. Ask a friend at IIT Madras who's already in a Buy & Sell group to add you
+2. These are unofficial student-run groups (typically named "Buy & Sell @ IIT Madras - 1", "Buy & Sell @ IIT Madras - 2", etc.)
+3. You must join these groups **manually through your WhatsApp** - the bot cannot join groups for you
+
+**The bot monitors these groups** (configurable in `config/config.json`):
+- Buy & Sell @ IIT Madras - 1
+- Buy & Sell @ IIT Madras - 2
+- Buy & Sell @ IIT Madras - 3
+- ... (up to 10)
+
+If you're not in any group that matches the names in your config, the bot will start but won't detect any sell messages.
+
+---
 
 ## What It Does
 
@@ -465,6 +496,7 @@ You can also control the bot via WhatsApp by messaging yourself:
 
 ### Prerequisites
 
+- **Member of IIT Madras Buy & Sell WhatsApp groups** - The bot monitors these groups for sell messages. You must manually join at least one "Buy & Sell @ IIT Madras" group through WhatsApp before the bot can work. Ask a friend at IITM to add you.
 - [Docker](https://docs.docker.com/get-docker/) installed on your system
 - [Docker Compose](https://docs.docker.com/compose/install/) (usually included with Docker Desktop)
 - A [Groq API key](https://console.groq.com/keys) (free tier available)
@@ -534,6 +566,7 @@ docker compose exec bot sqlite3 /app/data/mess_coupon.db ".tables"
 
 ### Prerequisites
 
+- **Member of IIT Madras Buy & Sell WhatsApp groups** - You must be in at least one "Buy & Sell @ IIT Madras" group
 - Node.js 20+
 - npm
 
@@ -696,9 +729,12 @@ Coupon images are automatically deleted after 2 days to save storage. The cleanu
 - Try: `docker compose restart`
 
 ### Bot not detecting messages
-- Ensure you're a member of the configured groups
-- Check group names match exactly in `config/config.json`
-- Verify `maxPrice` is set correctly
+- **Are you in the Buy & Sell groups?** You must manually join at least one "Buy & Sell @ IIT Madras" WhatsApp group. The bot cannot join groups for you - ask a friend at IITM to add you.
+- Check the group names in `config/config.json` match the actual group names in WhatsApp
+- Verify you're in at least one group that matches (e.g., "Buy & Sell @ IIT Madras - 1")
+- Ensure the bot is logged into the same WhatsApp account that's in the groups
+- Verify `maxPrice` is set correctly (default: 70)
+- Check if the "Bot Active" switch is turned ON in the dashboard
 
 ### Database issues
 ```bash

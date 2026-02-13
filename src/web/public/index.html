@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
   <title>Mess Coupon Bot</title>
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -32,6 +35,11 @@
       color: var(--text-primary);
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
+      padding-top: env(safe-area-inset-top);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .app { max-width: 1400px; margin: 0 auto; padding: 40px 24px; }
@@ -96,15 +104,35 @@
     .status-badge.paused { background: rgba(191, 90, 242, 0.15); color: var(--accent-purple); }
     .status-badge.skipped { background: rgba(255, 255, 255, 0.1); color: var(--text-tertiary); }
 
-    /* Toggle button (Reset/Mark Bought) */
-    .toggle-btn {
-      border: none; padding: 6px 12px; border-radius: 8px; font-size: 11px;
-      font-weight: 600; cursor: pointer; margin-top: 10px; transition: all 0.2s;
+    /* Status card header with play/pause button */
+    .status-card-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
     }
-    .toggle-btn.reset { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); }
-    .toggle-btn.reset:hover { background: rgba(255, 69, 58, 0.3); }
-    .toggle-btn.mark-bought { background: rgba(48, 209, 88, 0.15); color: var(--accent-green); }
-    .toggle-btn.mark-bought:hover { background: rgba(48, 209, 88, 0.3); }
+    .status-card-header .meal-type { margin-bottom: 0; }
+    .session-play-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s; font-size: 14px;
+      background: var(--bg-primary); color: var(--text-secondary);
+    }
+    .session-play-btn:hover { transform: scale(1.1); }
+    .session-play-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .session-play-btn.playing { background: rgba(255, 159, 10, 0.2); color: var(--accent-orange); }
+    .session-play-btn.paused { background: rgba(48, 209, 88, 0.2); color: var(--accent-green); }
+
+    /* Toggle buttons row */
+    .toggle-row {
+      display: flex; gap: 12px; margin-top: 16px;
+    }
+    .toggle-btn {
+      flex: 1; border: none; padding: 10px 16px; border-radius: 10px; font-size: 13px;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+      background: var(--bg-tertiary); color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+    }
+    .toggle-btn:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-primary); }
+    .toggle-btn.is-bought { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); border-color: transparent; }
+    .toggle-btn.is-bought:hover { background: rgba(255, 69, 58, 0.25); }
 
     /* Preference */
     .preference-section { overflow: visible; }
@@ -178,7 +206,7 @@
     .btn-success { background: var(--accent-green); color: white; }
     .btn-danger { background: var(--accent-red); color: white; }
     .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
-    .session-controls, .action-buttons { display: flex; gap: 12px; margin-top: 20px; }
+    .action-buttons { display: flex; gap: 12px; margin-top: 20px; }
 
     /* Action Card */
     .action-card {
@@ -220,6 +248,212 @@
     .history-status { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
     .history-status.success { background: rgba(48, 209, 88, 0.15); color: var(--accent-green); }
     .history-status.failed { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); }
+
+    /* View Coupon Button */
+    .view-coupon-btn {
+      margin-top: 8px; padding: 6px 12px; background: rgba(10, 132, 255, 0.15);
+      color: var(--accent-blue); border: none; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .view-coupon-btn:hover { background: rgba(10, 132, 255, 0.3); }
+    .history-item.clickable { cursor: pointer; }
+
+    /* Master Switch */
+    .master-switch-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px; background: var(--bg-tertiary); border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    .master-switch-label { flex: 1; }
+    .switch-title { display: block; font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .switch-desc { display: block; font-size: 12px; color: var(--text-tertiary); }
+    .master-switch {
+      position: relative; width: 56px; height: 32px; flex-shrink: 0;
+    }
+    .master-switch input { opacity: 0; width: 0; height: 0; }
+    .switch-slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg-primary); border: 2px solid var(--border-color);
+      border-radius: 32px; transition: all 0.3s;
+    }
+    .switch-slider:before {
+      position: absolute; content: ""; height: 24px; width: 24px;
+      left: 2px; bottom: 2px; background: var(--text-tertiary);
+      border-radius: 50%; transition: all 0.3s;
+    }
+    .master-switch input:checked + .switch-slider {
+      background: var(--accent-green); border-color: var(--accent-green);
+    }
+    .master-switch input:checked + .switch-slider:before {
+      transform: translateX(24px); background: white;
+    }
+    .master-switch input:disabled + .switch-slider {
+      opacity: 0.5; cursor: not-allowed;
+    }
+
+    /* Floating Conversations Bubble */
+    .convo-bubble {
+      display: none; /* Hidden by default, shown on mobile via JS */
+      position: fixed; bottom: 80px; right: 20px; z-index: 500;
+      width: 60px; height: 60px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      box-shadow: 0 4px 20px rgba(10, 132, 255, 0.4);
+      cursor: pointer; align-items: center; justify-content: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .convo-bubble:hover { transform: scale(1.1); box-shadow: 0 6px 25px rgba(10, 132, 255, 0.5); }
+    .convo-bubble:active { transform: scale(0.95); }
+    .convo-bubble .bubble-icon { font-size: 24px; }
+    .convo-bubble .bubble-count {
+      position: absolute; top: -4px; right: -4px;
+      min-width: 22px; height: 22px; padding: 0 6px;
+      background: var(--accent-red); color: white;
+      border-radius: 11px; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      animation: bubblePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes bubblePulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.9; }
+    }
+    .convo-bubble.hidden { display: none !important; }
+
+    /* Mobile Conversations Modal */
+    .mobile-convo-modal {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85); z-index: 1000;
+      display: none; align-items: flex-end; justify-content: center;
+    }
+    .mobile-convo-modal.active { display: flex; }
+    .mobile-convo-content {
+      background: var(--bg-secondary); border-radius: 20px 20px 0 0;
+      width: 100%; max-height: 80vh; overflow: hidden;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .mobile-convo-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px; border-bottom: 1px solid var(--border-color);
+    }
+    .mobile-convo-header h3 { font-size: 18px; font-weight: 600; }
+    .mobile-convo-content .conversation-list {
+      padding: 16px; max-height: calc(80vh - 70px); overflow-y: auto;
+    }
+    .mobile-convo-content .chat-container {
+      max-height: 200px; border-radius: 12px;
+    }
+    .mobile-convo-content .chat-messages {
+      max-height: 180px;
+    }
+    .mobile-convo-content .conversation-item {
+      margin-bottom: 16px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .mobile-convo-content .conversation-item:last-child {
+      margin-bottom: 0; padding-bottom: 0; border-bottom: none;
+    }
+
+    /* Help Button */
+    .help-btn {
+      position: fixed; top: 20px; right: 20px; z-index: 400;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--bg-tertiary); border: 1px solid var(--border-color);
+      color: var(--text-secondary); font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .help-btn:hover { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+
+    /* Help Modal */
+    .help-modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85); z-index: 1100;
+      display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .help-modal-overlay.active { display: flex; }
+    .help-modal {
+      background: var(--bg-secondary); border-radius: 20px;
+      max-width: 600px; width: 100%; max-height: 85vh;
+      overflow: hidden; animation: modalPop 0.3s ease;
+    }
+    @keyframes modalPop {
+      from { transform: scale(0.9); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .help-modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 24px; border-bottom: 1px solid var(--border-color);
+    }
+    .help-modal-header h2 { font-size: 22px; font-weight: 700; }
+    .help-modal-content {
+      padding: 24px; overflow-y: auto; max-height: calc(85vh - 80px);
+    }
+    .help-section {
+      margin-bottom: 24px; padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .help-section:last-child { border-bottom: none; margin-bottom: 0; }
+    .help-section h3 {
+      font-size: 16px; font-weight: 600; margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+    .help-section ol, .help-section ul {
+      margin-left: 20px; color: var(--text-secondary);
+      line-height: 1.8; font-size: 14px;
+    }
+    .help-section li { margin-bottom: 6px; }
+    .help-section strong { color: var(--text-primary); }
+    .help-section p { color: var(--text-secondary); line-height: 1.6; font-size: 14px; }
+    .help-section.warning {
+      background: rgba(255, 159, 10, 0.1); border-radius: 12px;
+      padding: 16px; border: none; margin-bottom: 20px;
+    }
+    .help-section.warning h3 { color: var(--accent-orange); }
+    .help-section.info {
+      background: rgba(10, 132, 255, 0.1); border-radius: 12px;
+      padding: 16px; border: none;
+    }
+    .help-section.info h3 { color: var(--accent-blue); }
+    .help-section.privacy {
+      background: rgba(52, 199, 89, 0.1); border-radius: 12px;
+      padding: 16px; border: none;
+    }
+    .help-section.privacy h3 { color: var(--accent-green); }
+    .help-tabs {
+      display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+      border-bottom: 1px solid var(--border-color); padding-bottom: 16px;
+    }
+    .help-tab {
+      padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 500;
+      background: var(--bg-tertiary); color: var(--text-secondary);
+      border: none; cursor: pointer; transition: all 0.2s;
+    }
+    .help-tab:hover { background: var(--bg-primary); }
+    .help-tab.active { background: var(--accent-blue); color: white; }
+    .help-tab-content { display: none; }
+    .help-tab-content.active { display: block; }
+    .feature-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px; margin: 12px 0;
+    }
+    .feature-item {
+      background: var(--bg-tertiary); border-radius: 12px; padding: 14px;
+    }
+    .feature-item .icon { font-size: 20px; margin-bottom: 8px; }
+    .feature-item .title { font-weight: 600; color: var(--text-primary); font-size: 13px; margin-bottom: 4px; }
+    .feature-item .desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+    .button-explain {
+      background: var(--bg-tertiary); border-radius: 12px; padding: 14px; margin: 10px 0;
+    }
+    .button-explain .btn-name {
+      font-weight: 600; color: var(--text-primary); font-size: 14px;
+      display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    }
+    .button-explain .btn-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
 
     /* Modal */
     .modal-overlay {
@@ -323,6 +557,55 @@
     }
     .login-status.success { background: rgba(48, 209, 88, 0.15); color: var(--accent-green); }
     .login-status.error { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); }
+
+    /* Login Method Toggle */
+    .login-toggle {
+      display: flex; justify-content: center; gap: 8px; margin-bottom: 24px;
+      background: var(--bg-tertiary); padding: 4px; border-radius: 10px;
+    }
+    .login-toggle-btn {
+      padding: 10px 20px; border: none; background: transparent; color: var(--text-secondary);
+      font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    .login-toggle-btn.active { background: var(--accent-blue); color: white; }
+    .login-toggle-btn:hover:not(.active) { color: var(--text-primary); }
+
+    /* Phone Login Form */
+    .phone-login-form { display: none; }
+    .phone-login-form.active { display: block; }
+    .phone-input-group { margin-bottom: 20px; }
+    .phone-input {
+      width: 100%; padding: 14px 16px; background: var(--bg-tertiary);
+      border: 1px solid var(--border-color); border-radius: 12px;
+      color: var(--text-primary); font-size: 16px; text-align: center;
+      letter-spacing: 1px;
+    }
+    .phone-input:focus { outline: none; border-color: var(--accent-blue); }
+    .phone-input::placeholder { color: var(--text-tertiary); letter-spacing: normal; }
+    .phone-hint { font-size: 12px; color: var(--text-tertiary); margin-top: 8px; }
+    .get-code-btn {
+      width: 100%; padding: 14px; background: var(--accent-blue); color: white;
+      border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .get-code-btn:hover { background: #0070e0; }
+    .get-code-btn:disabled { background: var(--bg-tertiary); color: var(--text-tertiary); cursor: not-allowed; }
+
+    /* Pairing Code Display */
+    .pairing-code-display { display: none; margin-bottom: 24px; }
+    .pairing-code-display.active { display: block; }
+    .pairing-code {
+      font-size: 32px; font-weight: 700; letter-spacing: 8px;
+      color: var(--accent-green); margin: 16px 0;
+      font-family: 'SF Mono', monospace;
+    }
+    .pairing-instructions {
+      font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+      background: var(--bg-tertiary); padding: 16px; border-radius: 12px;
+      text-align: left;
+    }
+    .pairing-instructions ol { margin: 8px 0 0 20px; }
+    .pairing-instructions li { margin: 4px 0; }
 
     /* User Badge & Logout */
     .user-badge {
@@ -507,11 +790,170 @@
       100% { opacity: 0; transform: scale(0.9); }
     }
 
+    /* Mobile Responsive Styles */
     @media (max-width: 768px) {
-      .app { padding: 24px 16px; }
-      .header h1 { font-size: 32px; }
-      .status-row, .stats-grid { grid-template-columns: 1fr; }
-      .session-controls, .action-buttons { flex-direction: column; }
+      .app { padding: 16px 12px; padding-bottom: 80px; }
+
+      /* Header */
+      .header { margin-bottom: 24px; }
+      .header h1 { font-size: 28px; }
+      .header .subtitle { font-size: 14px; }
+      .mode-indicator { padding: 6px 12px; font-size: 11px; }
+      .user-badge { flex-wrap: wrap; justify-content: center; gap: 8px; padding: 10px 12px; }
+
+      /* Tabs */
+      .tabs { width: 100%; margin-bottom: 20px; }
+      .tab { padding: 10px 16px; font-size: 13px; flex: 1; }
+
+      /* Grid - single column on mobile */
+      .main-grid { grid-template-columns: 1fr; gap: 16px; }
+
+      /* Cards */
+      .card { padding: 20px 16px; border-radius: 16px; }
+      .card-header { margin-bottom: 16px; }
+      .card-title { font-size: 18px; }
+
+      /* Status */
+      .status-row { grid-template-columns: 1fr 1fr; gap: 12px; }
+      .status-card { padding: 16px 12px; }
+      .status-badge { padding: 6px 12px; font-size: 13px; }
+      .toggle-row { gap: 10px; margin-top: 14px; }
+      .toggle-btn { padding: 10px 12px; font-size: 12px; }
+
+      /* Master Switch - more prominent on mobile */
+      .master-switch-row {
+        padding: 14px; margin-bottom: 14px;
+        border: 1px solid var(--accent-green);
+        background: linear-gradient(135deg, rgba(48, 209, 88, 0.08) 0%, rgba(48, 209, 88, 0.03) 100%);
+      }
+      .switch-title { font-size: 14px; }
+      .switch-desc { font-size: 11px; }
+      .master-switch { width: 50px; height: 28px; }
+      .switch-slider:before { height: 20px; width: 20px; }
+      .master-switch input:checked + .switch-slider:before { transform: translateX(18px); }
+
+      /* Preferences */
+      .preference-row { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 0; }
+      .preference-row > span { font-size: 14px; }
+      .multi-select { width: 100%; }
+      .multi-select-trigger { height: 44px; }
+      .multi-select-dropdown { max-height: 200px; }
+
+      /* Buttons */
+      .btn { padding: 14px 20px; font-size: 14px; border-radius: 10px; }
+      .action-buttons { flex-direction: row; gap: 10px; }
+      .action-buttons .btn { flex: 1; }
+
+      /* Stats */
+      .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .stat-card { padding: 12px 8px; }
+      .stat-value { font-size: 22px; }
+      .stat-label { font-size: 10px; }
+
+      /* History */
+      .history-list { gap: 10px; max-height: none; }
+      .history-item { padding: 14px; border-radius: 14px; flex-wrap: wrap; }
+      .history-icon { width: 48px; height: 48px; border-radius: 12px; font-size: 20px; }
+      .history-details { min-width: 0; flex: 1; }
+      .history-details .title { font-size: 15px; }
+      .history-details .meta { font-size: 12px; }
+      .history-status { font-size: 11px; padding: 4px 8px; }
+      .view-coupon-btn { padding: 8px 14px; font-size: 12px; }
+
+      /* Conversations */
+      .conversation-list { gap: 10px; max-height: none; }
+      .conversation-item { padding: 14px; }
+      .conversation-seller { font-size: 15px; }
+      .conversation-state { font-size: 10px; padding: 3px 8px; }
+      .conversation-actions { flex-wrap: wrap; }
+      .conv-action-btn { flex: 1; min-width: 80px; }
+      .chat-toggle { font-size: 12px; }
+      .chat-container.open { max-height: 300px; }
+      .chat-message { font-size: 13px; max-width: 85%; }
+
+      /* Action Card */
+      .action-card { padding: 20px 16px; }
+      .deal-info { padding: 14px; }
+      .deal-row { font-size: 13px; flex-wrap: wrap; gap: 4px; }
+      .deal-row .label { flex: 1; }
+      .deal-row .value { text-align: right; word-break: break-all; }
+
+      /* Log */
+      .log-container { max-height: 250px; }
+      .log-entry { font-size: 12px; padding: 12px; }
+
+      /* Modal */
+      .modal { padding: 24px 20px; border-radius: 16px; max-height: 85vh; }
+      .modal-header { margin-bottom: 16px; }
+      .modal-title { font-size: 20px; }
+      .modal-image { border-radius: 10px; }
+      .modal-info { padding: 14px; }
+      .modal-row { font-size: 13px; }
+
+      /* Login Page */
+      .login-page { min-height: 70vh; padding: 20px; }
+      .login-card { padding: 32px 24px; border-radius: 20px; }
+      .login-card h2 { font-size: 24px; }
+      .login-card .subtitle { font-size: 14px; margin-bottom: 24px; }
+      .login-toggle { flex-direction: row; }
+      .login-toggle-btn { padding: 10px 16px; font-size: 12px; }
+      .qr-container { padding: 16px; }
+      .qr-placeholder { width: 180px; height: 180px; font-size: 13px; }
+      .qr-container img, .qr-container canvas { width: 180px !important; height: 180px !important; }
+      .phone-input { padding: 14px; font-size: 16px; }
+      .get-code-btn { padding: 14px; font-size: 14px; }
+      .pairing-code { font-size: 26px; letter-spacing: 6px; }
+      .pairing-instructions { font-size: 12px; padding: 14px; }
+      .login-status { padding: 10px 16px; font-size: 13px; }
+
+      /* Connection indicator - bottom bar on mobile */
+      .connection-indicator {
+        bottom: 0; left: 0; right: 0; border-radius: 0;
+        justify-content: center; padding: 12px 16px;
+        border-top: 1px solid var(--border-color);
+      }
+
+      /* Hide conversations card, show floating bubble instead */
+      #conversationsCard { display: none; }
+      .convo-bubble { display: flex; }
+      .convo-bubble.hidden { display: none !important; }
+
+      /* Help button on mobile */
+      .help-btn { top: 12px; right: 12px; width: 32px; height: 32px; font-size: 14px; }
+      .help-modal { border-radius: 16px; }
+      .help-modal-header { padding: 20px; }
+      .help-modal-header h2 { font-size: 20px; }
+      .help-modal-content { padding: 20px; }
+      .help-section h3 { font-size: 15px; }
+      .help-section ol, .help-section ul { font-size: 13px; line-height: 1.7; }
+
+      /* Toast - full width on mobile */
+      .toast-container { left: 12px; right: 12px; top: 12px; }
+      .toast { max-width: none; }
+
+      /* Empty state */
+      .empty-state { padding: 30px 16px; }
+      .empty-state .icon { font-size: 40px; }
+    }
+
+    /* Extra small screens (phones in portrait) */
+    @media (max-width: 380px) {
+      .app { padding: 12px 10px; }
+      .header h1 { font-size: 24px; }
+      .status-row { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr 1fr; }
+      .stat-value { font-size: 18px; }
+      .action-buttons { flex-direction: column; }
+      .history-item { gap: 12px; }
+      .qr-placeholder { width: 160px; height: 160px; }
+      .qr-container img, .qr-container canvas { width: 160px !important; height: 160px !important; }
+
+      /* Master switch - ensure visible on tiny screens */
+      .master-switch-row { padding: 12px; }
+      .switch-title { font-size: 13px; }
+      .master-switch { width: 46px; height: 26px; }
+      .switch-slider:before { height: 18px; width: 18px; }
+      .master-switch input:checked + .switch-slider:before { transform: translateX(16px); }
     }
   </style>
 </head>
@@ -521,10 +963,46 @@
     <div id="loginPage" class="login-page">
       <div class="login-card">
         <h2>Welcome</h2>
-        <p class="subtitle">Scan the QR code with WhatsApp to login</p>
-        <div class="qr-container">
-          <div id="qrCode" class="qr-placeholder">Waiting for QR code...</div>
+        <p class="subtitle">Login with WhatsApp to continue</p>
+
+        <!-- Login Method Toggle -->
+        <div class="login-toggle">
+          <button class="login-toggle-btn active" onclick="switchLoginMethod('qr')">QR Code</button>
+          <button class="login-toggle-btn" onclick="switchLoginMethod('phone')">Phone Number</button>
         </div>
+
+        <!-- QR Code Login -->
+        <div id="qrLoginSection" class="qr-login-section">
+          <div class="qr-container">
+            <div id="qrCode" class="qr-placeholder">Waiting for QR code...</div>
+          </div>
+        </div>
+
+        <!-- Phone Number Login -->
+        <div id="phoneLoginSection" class="phone-login-form">
+          <div class="phone-input-group">
+            <input type="tel" id="phoneInput" class="phone-input" placeholder="91XXXXXXXXXX" maxlength="15">
+            <p class="phone-hint">Enter phone number with country code (e.g., 91 for India)</p>
+          </div>
+          <button id="getCodeBtn" class="get-code-btn" onclick="requestPairingCode()">Get Pairing Code</button>
+
+          <!-- Pairing Code Display -->
+          <div id="pairingCodeDisplay" class="pairing-code-display">
+            <p style="color: var(--text-secondary); margin-bottom: 8px;">Enter this code in WhatsApp:</p>
+            <div id="pairingCode" class="pairing-code">--------</div>
+            <div class="pairing-instructions">
+              <strong>How to link:</strong>
+              <ol>
+                <li>Open WhatsApp on your phone</li>
+                <li>Go to Settings → Linked Devices</li>
+                <li>Tap "Link a Device"</li>
+                <li>Select "Link with phone number instead"</li>
+                <li>Enter the code shown above</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
         <div id="loginStatus" class="login-status">Initializing...</div>
       </div>
     </div>
@@ -558,17 +1036,35 @@
           <!-- Status Card -->
           <div class="card" id="statusCard">
             <div class="card-header"><h2 class="card-title">Today's Status</h2></div>
+            <div class="master-switch-row">
+              <div class="master-switch-label">
+                <span class="switch-title">Bot Active</span>
+                <span class="switch-desc" id="switchDesc">Turn on to start finding coupons</span>
+              </div>
+              <label class="master-switch">
+                <input type="checkbox" id="masterSwitch" onchange="toggleMasterSwitch()">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
             <div class="status-row">
               <div class="status-card">
-                <div class="meal-type">Lunch</div>
+                <div class="status-card-header">
+                  <div class="meal-type">Lunch</div>
+                  <button id="lunchPlayBtn" class="session-play-btn" onclick="toggleSessionPause('lunch')" title="Play/Pause lunch session" disabled>▶</button>
+                </div>
                 <div id="lunchStatus" class="status-badge needed">Needed</div>
-                <button id="lunchToggleBtn" class="toggle-btn mark-bought" onclick="toggleSessionStatus('lunch')">Mark Bought</button>
               </div>
               <div class="status-card">
-                <div class="meal-type">Dinner</div>
+                <div class="status-card-header">
+                  <div class="meal-type">Dinner</div>
+                  <button id="dinnerPlayBtn" class="session-play-btn" onclick="toggleSessionPause('dinner')" title="Play/Pause dinner session" disabled>▶</button>
+                </div>
                 <div id="dinnerStatus" class="status-badge needed">Needed</div>
-                <button id="dinnerToggleBtn" class="toggle-btn mark-bought" onclick="toggleSessionStatus('dinner')">Mark Bought</button>
               </div>
+            </div>
+            <div class="toggle-row">
+              <button id="lunchToggleBtn" class="toggle-btn" onclick="toggleSessionStatus('lunch')">Mark Lunch Bought</button>
+              <button id="dinnerToggleBtn" class="toggle-btn" onclick="toggleSessionStatus('dinner')">Mark Dinner Bought</button>
             </div>
             <div class="preference-section">
               <div class="preference-row">
@@ -590,10 +1086,6 @@
                 </div>
               </div>
             </div>
-            <div class="session-controls">
-              <button class="btn btn-success" onclick="startSession()"><span>▶</span> Start</button>
-              <button class="btn btn-secondary" onclick="stopSession()"><span>⏹</span> Stop</button>
-            </div>
           </div>
 
           <!-- Action Card -->
@@ -611,7 +1103,7 @@
               <button class="btn btn-danger" onclick="declinePurchase()">Decline</button>
             </div>
             <div id="paymentButtons" class="action-buttons hidden">
-              <button class="btn btn-success" onclick="confirmPayment()">Payment Done</button>
+              <button class="btn btn-success" onclick="confirmPayment()">Confirm Payment</button>
             </div>
           </div>
 
@@ -626,7 +1118,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 24px;">
           <!-- Active Conversations -->
-          <div class="card">
+          <div class="card" id="conversationsCard">
             <div class="card-header"><h2 class="card-title">Active Conversations</h2></div>
             <div id="conversationList" class="conversation-list">
               <div class="empty-state"><div class="icon">💬</div><div class="text">No active conversations</div></div>
@@ -694,6 +1186,388 @@
 
   <div class="connection-indicator disconnected" id="connectionIndicator">
     <span class="dot"></span><span id="connectionText">Connecting...</span>
+  </div>
+
+  <!-- Floating Conversations Bubble (Mobile) -->
+  <div id="convoBubble" class="convo-bubble hidden" onclick="scrollToConversations()">
+    <span class="bubble-icon">💬</span>
+    <span id="convoBubbleCount" class="bubble-count">0</span>
+  </div>
+
+  <!-- Help/Support Button -->
+  <button class="help-btn" onclick="openHelpModal()" title="How to use">?</button>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="help-modal-overlay" onclick="if(event.target === this) closeHelpModal()">
+    <div class="help-modal">
+      <div class="help-modal-header">
+        <h2>Help & Guide</h2>
+        <button class="modal-close" onclick="closeHelpModal()">&times;</button>
+      </div>
+      <div class="help-modal-content">
+        <!-- Tabs -->
+        <div class="help-tabs">
+          <button class="help-tab active" onclick="switchHelpTab('overview')">Overview</button>
+          <button class="help-tab" onclick="switchHelpTab('smart')">How It Works</button>
+          <button class="help-tab" onclick="switchHelpTab('buttons')">Buttons</button>
+          <button class="help-tab" onclick="switchHelpTab('stop')">Stopping</button>
+          <button class="help-tab" onclick="switchHelpTab('privacy')">Privacy</button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="tab-overview" class="help-tab-content active">
+          <div class="help-section warning">
+            <h3>⚠️ Important - Read First!</h3>
+            <p><strong>The bot does NOT start automatically.</strong> You must turn ON the "Bot Active" switch to start searching for coupons. After each successful purchase, the switch turns OFF automatically - you need to turn it ON again for the next session.</p>
+          </div>
+
+          <div class="help-section">
+            <h3>🚀 Quick Start Guide</h3>
+            <ol>
+              <li><strong>Set your mess preferences</strong> - Select which mess(es) you want coupons from for lunch and dinner. You can select multiple or "Any" for flexibility.</li>
+              <li><strong>Turn ON the Bot Active switch</strong> - This master switch enables the bot to actively search for sellers in WhatsApp groups.</li>
+              <li><strong>Wait for a match</strong> - The bot monitors Buy & Sell groups and automatically contacts sellers when it finds matching offers.</li>
+              <li><strong>Confirm or Decline</strong> - When a seller responds with their UPI, you decide whether to proceed.</li>
+              <li><strong>Complete Payment</strong> - Pay via UPI, click "Confirm Payment", and receive your coupon!</li>
+            </ol>
+          </div>
+
+          <div class="help-section">
+            <h3>💡 Pro Tips</h3>
+            <ul>
+              <li>Set <strong>multiple mess preferences</strong> to increase your chances of finding a coupon quickly</li>
+              <li>The bot only buys <strong>1 coupon per meal</strong> (lunch OR dinner) - it won't overbuy</li>
+              <li>Check the <strong>History</strong> tab to see all your past purchases and spending stats</li>
+              <li>On mobile, tap the floating <strong>💬 bubble</strong> to see active conversations</li>
+              <li>Coupon images are stored for <strong>2 days</strong> then auto-deleted</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- How It Works Tab -->
+        <div id="tab-smart" class="help-tab-content">
+          <div class="help-section info">
+            <h3>🤖 Smart Bot Features</h3>
+            <p>This bot uses AI to intelligently negotiate and complete coupon purchases. Here's what makes it smart:</p>
+          </div>
+
+          <div class="feature-grid">
+            <div class="feature-item">
+              <div class="icon">🔍</div>
+              <div class="title">Auto-Detection</div>
+              <div class="desc">Scans WhatsApp groups every 5 minutes and instantly detects sell messages using AI pattern recognition.</div>
+            </div>
+            <div class="feature-item">
+              <div class="icon">💬</div>
+              <div class="title">Natural Conversations</div>
+              <div class="desc">Uses AI to generate human-like messages. Each conversation is unique - no robotic templates!</div>
+            </div>
+            <div class="feature-item">
+              <div class="icon">🍽️</div>
+              <div class="title">Mess Verification</div>
+              <div class="desc">If the seller doesn't mention which mess, the bot asks and verifies it matches your preference.</div>
+            </div>
+            <div class="feature-item">
+              <div class="icon">🔄</div>
+              <div class="title">Auto-Retry</div>
+              <div class="desc">If a deal fails, the bot automatically looks for other sellers. No manual intervention needed.</div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>💬 How Conversations Work</h3>
+            <ol>
+              <li><strong>Detection:</strong> Bot spots a sell message like "Selling dinner coupon A mess 60rs"</li>
+              <li><strong>First Contact:</strong> Bot sends a casual DM: "Hey, is the coupon still available?"</li>
+              <li><strong>Verification:</strong> If mess isn't mentioned, bot asks "Which mess is this for?"</li>
+              <li><strong>Price Check:</strong> Bot confirms the price is within acceptable range (≤₹70)</li>
+              <li><strong>UPI Request:</strong> Bot asks for payment details: "Sure, send your UPI ID"</li>
+              <li><strong>Your Turn:</strong> Bot shows you the deal and waits for your confirmation</li>
+              <li><strong>Payment:</strong> After you pay and confirm, bot notifies seller</li>
+              <li><strong>Coupon:</strong> Bot detects the coupon image and saves it for you</li>
+            </ol>
+          </div>
+
+          <div class="help-section">
+            <h3>🚫 When the Bot Refuses to Buy</h3>
+            <p>The bot will automatically skip or decline in these situations:</p>
+            <ul>
+              <li><strong>Wrong Mess:</strong> Seller's coupon is from a mess you didn't select in preferences</li>
+              <li><strong>Price Too High:</strong> Coupon costs more than ₹70 (configurable)</li>
+              <li><strong>Already Bought:</strong> You've already purchased that meal type today</li>
+              <li><strong>Bot Inactive:</strong> The master "Bot Active" switch is OFF</li>
+              <li><strong>Session Paused:</strong> You've manually paused the lunch/dinner session</li>
+              <li><strong>Active Deal:</strong> Bot is already negotiating with another seller</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h3>🔄 What Happens When a Deal Fails?</h3>
+            <p>Deals can fail for various reasons (seller stops responding, wrong mess, etc.). When this happens:</p>
+            <ul>
+              <li>The bot <strong>automatically</strong> marks the conversation as failed</li>
+              <li>The seller is removed from active conversations</li>
+              <li>Bot <strong>immediately resumes searching</strong> for other sellers</li>
+              <li>Recent sell messages (last 20 mins) are re-scanned for new opportunities</li>
+              <li>You'll see a notification about the failed deal</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Buttons Tab -->
+        <div id="tab-buttons" class="help-tab-content">
+          <div class="help-section">
+            <h3>🎛️ Master Controls</h3>
+
+            <div class="button-explain">
+              <div class="btn-name">🔘 Bot Active (ON/OFF Switch)</div>
+              <div class="btn-desc">
+                <strong>The most important control.</strong> When ON, the bot actively scans WhatsApp groups for sellers and initiates conversations. When OFF, the bot is completely idle and won't respond to any sell messages.<br><br>
+                <strong>Key behavior:</strong> This switch automatically turns OFF after every successful purchase. You must manually turn it ON again to search for the next coupon. This prevents accidental purchases.
+              </div>
+            </div>
+
+            <div class="button-explain">
+              <div class="btn-name">▶️/⏸️ Play/Pause Buttons (in Lunch/Dinner boxes)</div>
+              <div class="btn-desc">
+                Each meal type has its own play/pause button in the top-right corner of its status box. This allows independent control:<br>
+                • <strong>⏸ (Pause icon)</strong> - Session is active, click to pause searching for this meal<br>
+                • <strong>▶ (Play icon)</strong> - Session is paused, click to resume searching<br>
+                • <strong>✓ (Checkmark)</strong> - Meal already bought, button is disabled<br><br>
+                <strong>Note:</strong> These buttons only work when the Bot Active switch is ON.
+              </div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>🍽️ Meal Status Controls</h3>
+
+            <div class="button-explain">
+              <div class="btn-name">✓ Mark Bought (Lunch/Dinner)</div>
+              <div class="btn-desc">
+                Manually mark a meal as already purchased. Use this when:<br>
+                • You bought a coupon through another means (offline, different bot)<br>
+                • You want to skip a meal session entirely<br>
+                • The bot didn't detect a successful purchase<br><br>
+                The bot will stop searching for this meal type once marked as bought.
+              </div>
+            </div>
+
+            <div class="button-explain">
+              <div class="btn-name">↺ Reset (Lunch/Dinner)</div>
+              <div class="btn-desc">
+                Reset a meal status back to "Needed". Use this when:<br>
+                • You accidentally marked it as bought<br>
+                • You want to buy another coupon (e.g., for a friend)<br>
+                • A previous deal failed and you want to retry<br><br>
+                After resetting, turn ON the Bot Active switch to start searching again.
+              </div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>🎯 Action Buttons (During a Deal)</h3>
+
+            <div class="button-explain">
+              <div class="btn-name">✓ Confirm (Green Button)</div>
+              <div class="btn-desc">
+                Accept the deal and proceed to payment. The bot will notify the seller that you're about to pay. Only click this when you're ready to complete the purchase.
+              </div>
+            </div>
+
+            <div class="button-explain">
+              <div class="btn-name">✕ Decline (Red Button)</div>
+              <div class="btn-desc">
+                Reject this deal. The bot will politely inform the seller and automatically start looking for other sellers. Use this if the price, mess, or timing doesn't work for you.
+              </div>
+            </div>
+
+            <div class="button-explain">
+              <div class="btn-name">💳 Confirm Payment</div>
+              <div class="btn-desc">
+                Click this AFTER you've made the UPI payment to the seller. The bot will notify the seller that payment is sent and wait for them to send the coupon image.
+              </div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>💬 Conversation Controls</h3>
+
+            <div class="button-explain">
+              <div class="btn-name">👁️ View Chat</div>
+              <div class="btn-desc">
+                Opens a live view of the conversation between the bot and seller. Messages refresh automatically every 3 seconds. Useful for monitoring progress or troubleshooting.
+              </div>
+            </div>
+
+            <div class="button-explain">
+              <div class="btn-name">✓ Complete (Manual)</div>
+              <div class="btn-desc">
+                Manually mark a deal as successful. Use this only if:<br>
+                • The bot didn't auto-detect the coupon image<br>
+                • You received the coupon through a different channel<br>
+                • The deal completed but the status didn't update
+              </div>
+            </div>
+
+            <div class="button-explain">
+              <div class="btn-name">✕ Cancel (Manual)</div>
+              <div class="btn-desc">
+                Manually cancel an ongoing deal. The bot will send an apology message to the seller and start looking for other sellers. Use this if negotiations are going nowhere.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stopping Tab -->
+        <div id="tab-stop" class="help-tab-content">
+          <div class="help-section warning">
+            <h3>⏹️ How to Stop the Bot</h3>
+            <p>There are multiple ways to stop the bot depending on what you want to achieve:</p>
+          </div>
+
+          <div class="help-section">
+            <h3>1. Turn OFF the Bot Active Switch</h3>
+            <p><strong>Best for:</strong> Completely stopping all bot activity</p>
+            <ul>
+              <li>The bot will immediately stop searching for new sellers</li>
+              <li>Any ongoing conversations will continue until completion/timeout</li>
+              <li>The bot won't initiate any new conversations</li>
+              <li>This is the recommended way to stop the bot</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h3>2. Use the Play/Pause Buttons</h3>
+            <p><strong>Best for:</strong> Pausing specific meals while keeping bot ready</p>
+            <ul>
+              <li>Each meal (Lunch/Dinner) has its own ⏸/▶ button</li>
+              <li>Click ⏸ to pause searching for that specific meal</li>
+              <li>Click ▶ to resume searching</li>
+              <li>You can pause one meal while the other continues</li>
+              <li>Useful for fine-grained control</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h3>3. Mark Both Meals as Bought</h3>
+            <p><strong>Best for:</strong> Done for the day</p>
+            <ul>
+              <li>Mark both lunch and dinner as "Bought"</li>
+              <li>The bot has nothing to search for</li>
+              <li>Status resets automatically at midnight</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h3>4. Logout from WhatsApp</h3>
+            <p><strong>Best for:</strong> Complete shutdown or switching accounts</p>
+            <ul>
+              <li>Click the Logout button in the login card</li>
+              <li>Clears all session data</li>
+              <li>You'll need to scan QR code again to use the bot</li>
+              <li>Your preferences and history are preserved per account</li>
+            </ul>
+          </div>
+
+          <div class="help-section info">
+            <h3>💡 Remember</h3>
+            <p>The bot <strong>automatically turns OFF</strong> after every successful purchase. This is a safety feature to prevent accidental multiple purchases. You always need to manually turn it back ON for the next meal.</p>
+          </div>
+        </div>
+
+        <!-- Privacy Tab -->
+        <div id="tab-privacy" class="help-tab-content">
+          <div class="help-section privacy">
+            <h3>🔒 Privacy Policy</h3>
+            <p>Your privacy is important. Here's how this bot handles your data:</p>
+          </div>
+
+          <div class="help-section">
+            <h3>📱 WhatsApp Session</h3>
+            <ul>
+              <li>Your WhatsApp session is stored <strong>locally</strong> on the device running this bot</li>
+              <li>Session data is never transmitted to external servers</li>
+              <li>Logging out clears all session data from the device</li>
+              <li>Each WhatsApp account has separate, isolated data</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h3>💬 Message Handling</h3>
+            <ul>
+              <li>The bot only reads messages from <strong>Buy & Sell groups</strong> you're already a member of</li>
+              <li>Only messages containing sell keywords are processed</li>
+              <li>Conversation history is stored locally for troubleshooting</li>
+              <li>No messages are shared with third parties</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h3>🖼️ Coupon Images</h3>
+            <ul>
+              <li>Coupon images are stored <strong>locally</strong> in the data folder</li>
+              <li>Images are <strong>automatically deleted after 2 days</strong></li>
+              <li>Only you can access your coupon images through this dashboard</li>
+              <li>Images are never uploaded to external services</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h3>🤖 AI Processing</h3>
+            <ul>
+              <li>Message analysis uses the <strong>Groq API</strong> with Llama models</li>
+              <li>Only message text is sent for analysis (no personal identifiers)</li>
+              <li>Analysis is used to detect sell messages and generate responses</li>
+              <li>No conversation history is stored by the AI provider</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h3>📊 Data Storage</h3>
+            <ul>
+              <li>All data is stored in a <strong>local SQLite database</strong></li>
+              <li>Purchase history is kept for your records</li>
+              <li>Data is isolated per WhatsApp account (hashed phone number)</li>
+              <li>You can delete all data by removing the data folder</li>
+            </ul>
+          </div>
+
+          <div class="help-section warning">
+            <h3>⚠️ Fair Use Policy</h3>
+            <p>This bot is for <strong>personal use only</strong>. By using this bot, you agree to:</p>
+            <ul>
+              <li>Buy only what you need - maximum 1 coupon per session</li>
+              <li>Not use the bot for bulk buying or reselling</li>
+              <li>Not modify the bot to circumvent purchase limits</li>
+              <li>Respect other users and sellers in the community</li>
+            </ul>
+            <p style="margin-top: 12px;"><strong>Note:</strong> Breakfast and snacks coupons are intentionally not supported to prevent misuse.</p>
+          </div>
+
+          <div class="help-section">
+            <h3>📧 Contact & Support</h3>
+            <p>This is an open-source project. For issues, suggestions, or contributions:</p>
+            <ul>
+              <li>GitHub: Report issues or contribute code</li>
+              <li>The bot creator is not responsible for any transactions</li>
+              <li>Use at your own risk - always verify coupon validity</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Conversations Modal -->
+  <div id="mobileConvoModal" class="mobile-convo-modal" onclick="if(event.target === this) closeMobileConvo()">
+    <div class="mobile-convo-content">
+      <div class="mobile-convo-header">
+        <h3>Active Conversations</h3>
+        <button class="modal-close" onclick="closeMobileConvo()">&times;</button>
+      </div>
+      <div id="mobileConvoList" class="conversation-list"></div>
+    </div>
   </div>
 
   <div class="toast-container" id="toastContainer"></div>
@@ -855,6 +1729,93 @@
       }
     });
 
+    // Login method switching
+    let currentLoginMethod = 'qr';
+
+    function switchLoginMethod(method) {
+      currentLoginMethod = method;
+
+      // Update toggle buttons
+      document.querySelectorAll('.login-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.toLowerCase().includes(method));
+      });
+
+      // Show/hide sections
+      document.getElementById('qrLoginSection').style.display = method === 'qr' ? 'block' : 'none';
+      document.getElementById('phoneLoginSection').classList.toggle('active', method === 'phone');
+
+      // Update subtitle
+      const subtitle = document.querySelector('.login-card .subtitle');
+      if (method === 'qr') {
+        subtitle.textContent = 'Scan the QR code with WhatsApp to login';
+      } else {
+        subtitle.textContent = 'Enter your phone number to get a pairing code';
+      }
+    }
+
+    // Request pairing code
+    async function requestPairingCode() {
+      const phoneInput = document.getElementById('phoneInput');
+      const getCodeBtn = document.getElementById('getCodeBtn');
+      const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
+      const pairingCodeEl = document.getElementById('pairingCode');
+      const loginStatus = document.getElementById('loginStatus');
+
+      const phoneNumber = phoneInput.value.replace(/[^\d]/g, ''); // Keep only digits
+
+      if (!phoneNumber || phoneNumber.length < 10) {
+        showToast('error', 'Invalid Number', 'Please enter a valid phone number with country code');
+        return;
+      }
+
+      getCodeBtn.disabled = true;
+      getCodeBtn.textContent = 'Requesting...';
+      loginStatus.textContent = 'Requesting pairing code...';
+      loginStatus.className = 'login-status';
+
+      try {
+        const res = await fetch('/api/auth/pairing-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber })
+        });
+        const data = await res.json();
+
+        if (data.success && data.code) {
+          // Format code with dashes for display (e.g., "1234-5678")
+          const formattedCode = data.code.match(/.{1,4}/g).join('-');
+          pairingCodeEl.textContent = formattedCode;
+          pairingCodeDisplay.classList.add('active');
+          loginStatus.textContent = 'Enter the code in WhatsApp';
+          loginStatus.className = 'login-status success';
+          showToast('success', 'Code Generated', 'Enter this code in WhatsApp');
+        } else {
+          loginStatus.textContent = data.error || 'Failed to get pairing code';
+          loginStatus.className = 'login-status error';
+          showToast('error', 'Error', data.error || 'Failed to get pairing code');
+        }
+      } catch (error) {
+        console.error('Pairing code request failed:', error);
+        loginStatus.textContent = 'Network error';
+        loginStatus.className = 'login-status error';
+        showToast('error', 'Error', 'Network error');
+      } finally {
+        getCodeBtn.disabled = false;
+        getCodeBtn.textContent = 'Get Pairing Code';
+      }
+    }
+
+    // Listen for pairing code from server (in case it's pushed)
+    socket.on('pairingCode', (data) => {
+      if (data.code) {
+        const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
+        const pairingCodeEl = document.getElementById('pairingCode');
+        const formattedCode = data.code.match(/.{1,4}/g).join('-');
+        pairingCodeEl.textContent = formattedCode;
+        pairingCodeDisplay.classList.add('active');
+      }
+    });
+
     // Logout handler
     async function handleLogout() {
       if (!confirm('Are you sure you want to logout? You will need to scan QR code again.')) return;
@@ -923,12 +1884,14 @@
       modeIndicator.className = 'mode-indicator ' + status.mode;
 
       updateStatusBadges(status.dailyStatus, status);
+      updateSessionButtons(status);
       populateMessDropdowns(status.messes);
       // Update multi-select with current preferences (now arrays)
       updateMultiSelectValue('lunchPreference', status.lunchPreference || []);
       updateMultiSelectValue('dinnerPreference', status.dinnerPreference || []);
       updateActionCard(status);
       updateConversations(status.activeConversations);
+      updateConvoBubble(status.activeConversations);
       loadTodayDeals();
     }
 
@@ -943,8 +1906,8 @@
         badge.textContent = capitalize(state);
         // Update toggle button based on bought status
         const isBought = status?.lunchBought || state === 'bought';
-        toggleBtn.textContent = isBought ? 'Reset' : 'Mark Bought';
-        toggleBtn.className = 'toggle-btn ' + (isBought ? 'reset' : 'mark-bought');
+        toggleBtn.textContent = isBought ? 'Reset Lunch' : 'Mark Lunch Bought';
+        toggleBtn.className = 'toggle-btn' + (isBought ? ' is-bought' : '');
       }
       if (dinnerMatch) {
         const badge = document.getElementById('dinnerStatus');
@@ -954,8 +1917,8 @@
         badge.textContent = capitalize(state);
         // Update toggle button based on bought status
         const isBought = status?.dinnerBought || state === 'bought';
-        toggleBtn.textContent = isBought ? 'Reset' : 'Mark Bought';
-        toggleBtn.className = 'toggle-btn ' + (isBought ? 'reset' : 'mark-bought');
+        toggleBtn.textContent = isBought ? 'Reset Dinner' : 'Mark Dinner Bought';
+        toggleBtn.className = 'toggle-btn' + (isBought ? ' is-bought' : '');
       }
     }
 
@@ -1085,13 +2048,8 @@
         const wasActive = prev && prev.state !== 'COMPLETED' && prev.state !== 'FAILED';
 
         if (isNowFinished && wasActive) {
-          console.log('🎬 Conversation just finished:', conv.id, conv.state);
-          // Show toast for state transition
-          if (conv.state === 'COMPLETED') {
-            showToast('success', '🎉 Success!', `Coupon secured from ${conv.sellerName}!`);
-          } else {
-            showToast('error', 'Deal Failed', `${conv.couponType} deal with ${conv.sellerName} failed`);
-          }
+          console.log('Conversation just finished:', conv.id, conv.state);
+          // Toast is handled by backend broadcastNotification - no duplicate here
           // Close the chat dropdown
           openChats.delete(conv.id);
           // Schedule removal after animation
@@ -1344,12 +2302,19 @@
         const dateStr = date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
         const iconClass = d.status === 'success' ? d.couponType : 'failed';
         const icon = d.status === 'success' ? (d.couponType === 'lunch' ? '☀️' : '🌙') : '❌';
+        const hasImage = d.status === 'success' && d.couponImagePath;
+        const viewCouponBtn = hasImage ? `
+          <button class="view-coupon-btn" onclick="event.stopPropagation(); openModal('${d.id}', '${d.couponType}', '${d.sellerName}', '${d.messName || '-'}', '${d.price}', '${dateStr} ${timeStr}', '${d.couponImagePath}')">
+            📄 View Coupon
+          </button>
+        ` : '';
         return `
-          <div class="history-item" onclick="${d.status === 'success' && d.couponImagePath ? `openModal('${d.id}', '${d.couponType}', '${d.sellerName}', '${d.messName || '-'}', '${d.price}', '${dateStr} ${timeStr}', '${d.couponImagePath}')` : ''}">
+          <div class="history-item ${hasImage ? 'clickable' : ''}" ${hasImage ? `onclick="openModal('${d.id}', '${d.couponType}', '${d.sellerName}', '${d.messName || '-'}', '${d.price}', '${dateStr} ${timeStr}', '${d.couponImagePath}')"` : ''}>
             <div class="history-icon ${iconClass}">${icon}</div>
             <div class="history-details">
               <div class="title">${capitalize(d.couponType)} Coupon</div>
               <div class="meta">${d.sellerName} • ${isToday ? timeStr : dateStr + ' ' + timeStr}${d.messName ? ' • ' + d.messName : ''}</div>
+              ${viewCouponBtn}
             </div>
             <span class="history-status ${d.status}">${d.status === 'success' ? '✓ Success' : '✕ Failed'}</span>
           </div>
@@ -1392,16 +2357,316 @@
 
     function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-    async function startSession() {
-      const res = await fetch('/api/start', { method: 'POST' });
-      const data = await res.json();
-      showToast(data.startedSession ? 'success' : 'warning', data.startedSession ? 'Started' : 'No Session', data.startedSession ? `Looking for ${data.startedSession}` : 'No session to start');
+    let isBotActive = false;
+
+    // Master switch functions
+    async function toggleMasterSwitch() {
+      const switchEl = document.getElementById('masterSwitch');
+      const newState = switchEl.checked;
+
+      try {
+        const res = await fetch('/api/bot-active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: newState })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          isBotActive = newState;
+          updateMasterSwitchUI();
+          // Toast handled by backend broadcastNotification
+        } else {
+          // Revert switch
+          switchEl.checked = !newState;
+          showToast('error', 'Error', data.error || 'Failed to toggle bot');
+        }
+      } catch (error) {
+        switchEl.checked = !newState;
+        showToast('error', 'Error', 'Failed to toggle bot');
+      }
     }
 
-    async function stopSession() {
-      const res = await fetch('/api/stop', { method: 'POST' });
-      const data = await res.json();
-      showToast(data.stoppedSession ? 'info' : 'warning', data.stoppedSession ? 'Stopped' : 'No Session', data.stoppedSession ? `${capitalize(data.stoppedSession)} paused` : 'No session to stop');
+    function updateMasterSwitchUI() {
+      const switchEl = document.getElementById('masterSwitch');
+      const descEl = document.getElementById('switchDesc');
+
+      if (switchEl) switchEl.checked = isBotActive;
+
+      if (descEl) {
+        descEl.textContent = isBotActive ? 'Bot is actively searching' : 'Turn on to start finding coupons';
+      }
+
+      // Update play buttons state based on bot active
+      updatePlayButtons();
+    }
+
+    function updatePlayButtons() {
+      const lunchBtn = document.getElementById('lunchPlayBtn');
+      const dinnerBtn = document.getElementById('dinnerPlayBtn');
+
+      // Disable buttons if bot is not active
+      if (lunchBtn) lunchBtn.disabled = !isBotActive;
+      if (dinnerBtn) dinnerBtn.disabled = !isBotActive;
+    }
+
+    function updateSessionButtons(status) {
+      // Update bot active state from status
+      if (status.botActive !== undefined) {
+        isBotActive = status.botActive;
+        updateMasterSwitchUI();
+      }
+
+      const lunchBtn = document.getElementById('lunchPlayBtn');
+      const dinnerBtn = document.getElementById('dinnerPlayBtn');
+
+      // Update lunch button
+      if (lunchBtn) {
+        lunchBtn.disabled = !isBotActive || status.lunchBought;
+        if (status.lunchBought) {
+          lunchBtn.className = 'session-play-btn';
+          lunchBtn.innerHTML = '✓';
+          lunchBtn.title = 'Lunch already bought';
+        } else if (status.lunchPaused) {
+          lunchBtn.className = 'session-play-btn paused';
+          lunchBtn.innerHTML = '▶';
+          lunchBtn.title = 'Resume lunch session';
+        } else {
+          lunchBtn.className = 'session-play-btn playing';
+          lunchBtn.innerHTML = '⏸';
+          lunchBtn.title = 'Pause lunch session';
+        }
+      }
+
+      // Update dinner button
+      if (dinnerBtn) {
+        dinnerBtn.disabled = !isBotActive || status.dinnerBought;
+        if (status.dinnerBought) {
+          dinnerBtn.className = 'session-play-btn';
+          dinnerBtn.innerHTML = '✓';
+          dinnerBtn.title = 'Dinner already bought';
+        } else if (status.dinnerPaused) {
+          dinnerBtn.className = 'session-play-btn paused';
+          dinnerBtn.innerHTML = '▶';
+          dinnerBtn.title = 'Resume dinner session';
+        } else {
+          dinnerBtn.className = 'session-play-btn playing';
+          dinnerBtn.innerHTML = '⏸';
+          dinnerBtn.title = 'Pause dinner session';
+        }
+      }
+    }
+
+    async function toggleSessionPause(type) {
+      if (!isBotActive) {
+        showToast('warning', 'Bot Inactive', 'Turn ON the Bot Active switch first');
+        return;
+      }
+
+      const status = currentStatus;
+      const isPaused = type === 'lunch' ? status?.lunchPaused : status?.dinnerPaused;
+      const isBought = type === 'lunch' ? status?.lunchBought : status?.dinnerBought;
+
+      if (isBought) {
+        showToast('info', 'Already Bought', `${capitalize(type)} is already bought`);
+        return;
+      }
+
+      try {
+        const endpoint = isPaused ? 'resume' : 'pause';
+        const res = await fetch(`/api/session/${type}/${endpoint}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+          // Status will be updated via socket
+        }
+      } catch (error) {
+        showToast('error', 'Error', `Failed to ${isPaused ? 'resume' : 'pause'} ${type} session`);
+      }
+    }
+
+    // Mobile conversation bubble functions
+    function isMobile() {
+      return window.innerWidth <= 768;
+    }
+
+    function updateConvoBubble(conversations) {
+      const bubble = document.getElementById('convoBubble');
+      const countEl = document.getElementById('convoBubbleCount');
+      if (!bubble || !countEl) return;
+
+      // Count only active (non-completed, non-failed) conversations
+      const activeConvos = (conversations || []).filter(c =>
+        c.state !== 'COMPLETED' && c.state !== 'FAILED'
+      );
+      const count = activeConvos.length;
+
+      countEl.textContent = count;
+
+      // Show bubble only on mobile and when there are active conversations
+      if (isMobile() && count > 0) {
+        bubble.classList.remove('hidden');
+      } else {
+        bubble.classList.add('hidden');
+      }
+
+      // Also update mobile modal content if open
+      const mobileList = document.getElementById('mobileConvoList');
+      if (mobileList && document.getElementById('mobileConvoModal').classList.contains('active')) {
+        updateMobileConvoList(conversations);
+      }
+    }
+
+    function scrollToConversations() {
+      // On mobile, open the modal instead of scrolling
+      if (isMobile()) {
+        openMobileConvo();
+      } else {
+        const card = document.getElementById('conversationsCard');
+        if (card) card.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function openMobileConvo() {
+      const modal = document.getElementById('mobileConvoModal');
+      modal.classList.add('active');
+      // Populate with current conversations
+      if (currentStatus && currentStatus.activeConversations) {
+        updateMobileConvoList(currentStatus.activeConversations);
+      }
+      // Start auto-refresh
+      startMobileConvoRefresh();
+    }
+
+    function closeMobileConvo() {
+      const modal = document.getElementById('mobileConvoModal');
+      modal.classList.remove('active');
+      // Stop auto-refresh
+      stopMobileConvoRefresh();
+    }
+
+    function updateMobileConvoList(conversations) {
+      const container = document.getElementById('mobileConvoList');
+      if (!container) return;
+
+      const activeConvos = (conversations || []).filter(c =>
+        c.state !== 'COMPLETED' && c.state !== 'FAILED'
+      );
+
+      if (activeConvos.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">💬</div><div class="text">No active conversations</div></div>';
+        return;
+      }
+
+      container.innerHTML = activeConvos.map(c => `
+        <div class="conversation-item" data-mobile-conv="${c.id}">
+          <div class="conversation-header">
+            <span class="conversation-seller">${c.sellerName}</span>
+            <span class="conversation-state ${c.state.includes('PAYMENT') ? 'payment' : 'awaiting'}">${c.state.replace(/_/g, ' ')}</span>
+          </div>
+          <div style="font-size: 13px; color: var(--text-tertiary)">${c.couponType.toUpperCase()} • ₹${c.price}${c.messName ? ' • ' + c.messName : ''}</div>
+          <div class="chat-container open" style="margin-top: 12px;">
+            <div class="chat-messages" id="mobile-messages-${c.id}">
+              <div class="chat-empty">Loading messages...</div>
+            </div>
+          </div>
+          <div class="conversation-actions" style="display: flex; gap: 8px; margin-top: 12px;">
+            <button class="conv-action-btn complete" onclick="manualComplete('${c.id}'); closeMobileConvo();">✓ Complete</button>
+            <button class="conv-action-btn fail" onclick="manualFail('${c.id}'); closeMobileConvo();">✕ Cancel</button>
+          </div>
+        </div>
+      `).join('');
+
+      // Load messages for each conversation
+      activeConvos.forEach(c => loadMobileChatMessages(c.id));
+    }
+
+    // Load chat messages for mobile modal
+    async function loadMobileChatMessages(convId) {
+      const messagesContainer = document.getElementById('mobile-messages-' + convId);
+      if (!messagesContainer) return;
+
+      try {
+        const res = await fetch('/api/conversation/' + convId + '/messages');
+        const data = await res.json();
+
+        if (!data.messages || data.messages.length === 0) {
+          messagesContainer.innerHTML = '<div class="chat-empty">No messages yet</div>';
+          return;
+        }
+
+        messagesContainer.innerHTML = data.messages.map(m => {
+          const time = new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+          const text = m.hasMedia ? (m.text || '[Image]') : m.text;
+          return `
+            <div class="chat-message ${m.sender}">
+              <div class="text">${escapeHtml(text)}</div>
+              <div class="time">${time}</div>
+            </div>
+          `;
+        }).join('');
+
+        // Scroll to bottom
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      } catch (error) {
+        console.error('Failed to load mobile messages:', error);
+        messagesContainer.innerHTML = '<div class="chat-empty">Failed to load</div>';
+      }
+    }
+
+    // Auto-refresh mobile messages when modal is open
+    let mobileConvoRefreshInterval = null;
+
+    function startMobileConvoRefresh() {
+      if (mobileConvoRefreshInterval) return;
+      mobileConvoRefreshInterval = setInterval(() => {
+        if (currentStatus && currentStatus.activeConversations) {
+          const activeConvos = currentStatus.activeConversations.filter(c =>
+            c.state !== 'COMPLETED' && c.state !== 'FAILED'
+          );
+          activeConvos.forEach(c => loadMobileChatMessages(c.id));
+        }
+      }, 3000); // Refresh every 3 seconds
+    }
+
+    function stopMobileConvoRefresh() {
+      if (mobileConvoRefreshInterval) {
+        clearInterval(mobileConvoRefreshInterval);
+        mobileConvoRefreshInterval = null;
+      }
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (currentStatus && currentStatus.activeConversations) {
+        updateConvoBubble(currentStatus.activeConversations);
+      }
+    });
+
+    // Help modal functions
+    function openHelpModal() {
+      document.getElementById('helpModal').classList.add('active');
+    }
+
+    function closeHelpModal() {
+      document.getElementById('helpModal').classList.remove('active');
+    }
+
+    function switchHelpTab(tabName) {
+      // Update tab buttons
+      document.querySelectorAll('.help-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // Update tab content
+      document.querySelectorAll('.help-tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      const tabContent = document.getElementById('tab-' + tabName);
+      if (tabContent) {
+        tabContent.classList.add('active');
+      }
     }
 
     async function setPreference(type, messNames) {
@@ -1413,18 +2678,17 @@
 
     async function confirmPurchase() { await fetch('/api/confirm', { method: 'POST' }); showToast('success', 'Confirmed', 'Proceeding...'); }
     async function declinePurchase() { await fetch('/api/decline', { method: 'POST' }); showToast('info', 'Declined', 'Looking for others...'); }
-    async function confirmPayment() { await fetch('/api/paid', { method: 'POST' }); showToast('success', 'Payment Done', 'Waiting for coupon...'); }
+    async function confirmPayment() { await fetch('/api/paid', { method: 'POST' }); showToast('success', 'Confirm Payment', 'Waiting for coupon...'); }
 
     async function manualComplete(convId) {
       if (!confirm('Mark this deal as completed (successful)? This will record it as a successful purchase.')) return;
       try {
         const res = await fetch(`/api/conversation/${convId}/complete`, { method: 'POST' });
         const data = await res.json();
-        if (data.success) {
-          showToast('success', 'Completed', 'Deal marked as successful');
-        } else {
+        if (!data.success) {
           showToast('error', 'Error', data.error || 'Failed to complete');
         }
+        // Success toast handled by backend broadcastNotification
       } catch (error) {
         showToast('error', 'Error', 'Network error');
       }
@@ -1439,11 +2703,10 @@
           body: JSON.stringify({ reason: 'Manually cancelled by user' })
         });
         const data = await res.json();
-        if (data.success) {
-          showToast('info', 'Cancelled', 'Deal cancelled');
-        } else {
+        if (!data.success) {
           showToast('error', 'Error', data.error || 'Failed to cancel');
         }
+        // Success toast handled by backend broadcastNotification
       } catch (error) {
         showToast('error', 'Error', 'Network error');
       }
@@ -1453,11 +2716,7 @@
       const res = await fetch(`/api/toggle/${type}`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        if (data.newStatus === 'needed') {
-          showToast('info', 'Reset', `${capitalize(type)} reset to needed`);
-        } else {
-          showToast('success', 'Marked', `${capitalize(type)} marked as bought`);
-        }
+        // Toast handled by backend broadcastNotification
       } else {
         showToast('error', 'Error', data.error || 'Failed to toggle status');
       }
@@ -1473,7 +2732,13 @@
     }, 5000);
 
     // Keyboard shortcut to close modal
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeModal();
+        closeHelpModal();
+        closeMobileConvo();
+      }
+    });
   </script>
 </body>
 </html>

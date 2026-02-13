@@ -54,6 +54,9 @@ class MessCouponBot {
   // Web server
   private webServer: WebServer | null = null;
 
+  // Master ON/OFF switch - bot only searches when active
+  private botActive: boolean = false;
+
   async start(mode: BotMode = 'real'): Promise<void> {
     this.mode = mode;
 
@@ -137,10 +140,15 @@ class MessCouponBot {
       () => this.saveCurrentState(),
       (type, convId) => {
         this.dailyTracker.markCouponBought(type, convId);
+
+        // Auto-turn off bot after successful purchase
+        this.botActive = false;
+        logger.info('Bot auto-deactivated after successful purchase', { type });
+
         // Broadcast coupon purchased event to web dashboard
         if (this.webServer) {
           const conv = this.conversations.get(convId);
-          this.webServer.broadcastNotification('success', 'Coupon Purchased!', `${type} coupon from ${conv?.sellerName || 'seller'}`);
+          this.webServer.broadcastNotification('success', 'Coupon Purchased!', `${type} coupon from ${conv?.sellerName || 'seller'} — bot turned off`);
           this.webServer.getIO().emit('conversationEnd', { convId, result: 'success', type });
           this.broadcastWebStatus();
         }
@@ -193,7 +201,7 @@ class MessCouponBot {
     this.groupMonitor = new GroupMonitor(
       this.processedMessageIds,
       async (sellMessage) => this.handleSellMessage(sellMessage),
-      (type) => this.dailyTracker.canBuyCoupon(type) && !this.conversationManager.hasActiveConversationInProgress()
+      (type) => this.botActive && this.dailyTracker.canBuyCoupon(type) && !this.conversationManager.hasActiveConversationInProgress()
     );
 
     // Start web server FIRST so QR code can be displayed on frontend
@@ -590,6 +598,12 @@ class MessCouponBot {
         confidence: detection.confidence
       });
 
+      // Check if bot is active
+      if (!this.botActive) {
+        logger.info('Bot is not active, ignoring sell message');
+        return;
+      }
+
       if (!this.dailyTracker.canBuyCoupon(detection.couponType)) {
         logger.info('Already have this coupon type, skipping');
         return;
@@ -662,6 +676,12 @@ class MessCouponBot {
       group: sellMessage.groupName,
       rawMessage: sellMessage.rawMessage.substring(0, 50)
     });
+
+    // Check if bot is active (safeguard)
+    if (!this.botActive) {
+      logger.info('Bot is not active, skipping sell message');
+      return;
+    }
 
     // Clean up old skipped messages (older than 20 minutes)
     this.cleanupOldSkippedMessages();
@@ -1045,6 +1065,31 @@ class MessCouponBot {
         return result;
       },
 
+      onPauseSession: (type: CouponType) => {
+        const typeCap = type.charAt(0).toUpperCase() + type.slice(1);
+        this.dailyTracker.pauseSession(type);
+        this.saveCurrentState();
+        this.webServer?.broadcastNotification('info', `${typeCap} Paused`, `${typeCap} session paused`);
+        logger.info('Session paused via dashboard', { type });
+        return { success: true, paused: true };
+      },
+
+      onResumeSession: (type: CouponType) => {
+        const typeCap = type.charAt(0).toUpperCase() + type.slice(1);
+        this.dailyTracker.resumeSession(type);
+        this.saveCurrentState();
+        this.webServer?.broadcastNotification('success', `${typeCap} Resumed`, `Now looking for ${type} coupons`);
+        logger.info('Session resumed via dashboard', { type });
+
+        // Trigger a poll if bot is active
+        if (this.botActive && this.mode === 'real') {
+          this.groupMonitor.pollLatestMessages().catch(err =>
+            logger.error('Failed to poll after resume', err)
+          );
+        }
+        return { success: true, paused: false };
+      },
+
       onSetPreference: (type: CouponType, messNames: string[] | null) => {
         if (type === 'lunch') {
           this.dailyTracker.setLunchPreference(messNames);
@@ -1117,6 +1162,27 @@ class MessCouponBot {
         return result;
       },
 
+      onSetBotActive: (active: boolean) => {
+        this.botActive = active;
+        logger.info('Bot active status changed via dashboard', { active });
+
+        if (active) {
+          // When turning ON, start looking for coupons
+          this.webServer?.broadcastNotification('success', 'Bot Activated', 'Now searching for coupons...');
+
+          // Immediately poll for messages if in real mode
+          if (this.mode === 'real') {
+            this.groupMonitor.pollLatestMessages().catch(err =>
+              logger.error('Failed to poll after activation', err)
+            );
+          }
+        } else {
+          this.webServer?.broadcastNotification('info', 'Bot Deactivated', 'Bot is now idle');
+        }
+
+        return { success: true };
+      },
+
       onLogout: async () => {
         logger.info('Logout requested');
         await logout();
@@ -1135,6 +1201,7 @@ class MessCouponBot {
         this.pendingPaymentConvId = null;
         this.pendingPreferenceType = null;
         this.pendingPreferenceUpdate = false;
+        this.botActive = false;  // Reset bot active state on logout
 
         // Reset daily tracker to empty state (not for any specific user)
         this.dailyTracker.reset();
@@ -1175,7 +1242,8 @@ class MessCouponBot {
         lunchPaused: this.dailyTracker.isSessionPaused('lunch'),
         dinnerPaused: this.dailyTracker.isSessionPaused('dinner'),
         lunchBought: this.dailyTracker.isSessionBought('lunch'),
-        dinnerBought: this.dailyTracker.isSessionBought('dinner')
+        dinnerBought: this.dailyTracker.isSessionBought('dinner'),
+        botActive: this.botActive
       }),
 
       getActiveConversations: () => {
