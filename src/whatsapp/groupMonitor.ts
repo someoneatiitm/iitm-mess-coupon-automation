@@ -147,9 +147,6 @@ export class GroupMonitor {
       preview: message.body.substring(0, 50)
     });
 
-    // Mark as processed
-    this.processedMessageIds.add(message.id._serialized);
-
     // Detect if this is a sell message
     const detection = await detectSellMessage(message.body);
 
@@ -163,9 +160,14 @@ export class GroupMonitor {
 
       // Check if we need this type of coupon
       if (!this.canProcessCoupon(detection.couponType)) {
-        logger.info('Already have this coupon type, skipping', { couponType: detection.couponType });
+        // DON'T mark as processed - will be reconsidered on next poll
+        // when bot becomes active or session resets
+        logger.info('Cannot process this coupon right now, will retry on next poll', { couponType: detection.couponType });
         return;
       }
+
+      // Mark as processed only when we're actually acting on it
+      this.processedMessageIds.add(message.id._serialized);
 
       // Get sender info
       const contact = await message.getContact();
@@ -182,6 +184,9 @@ export class GroupMonitor {
       };
 
       await this.onSellMessage(sellMessage);
+    } else {
+      // Not a sell message - mark as processed so we don't re-check it
+      this.processedMessageIds.add(message.id._serialized);
     }
   }
 
