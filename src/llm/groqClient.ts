@@ -16,7 +16,7 @@ export function initGroqClient(): Groq {
   return groqClient;
 }
 
-export async function chat(systemPrompt: string, userMessage: string): Promise<string> {
+export async function chat(systemPrompt: string, userMessage: string, options: { temperature?: number; maxTokens?: number } = {}): Promise<string> {
   const client = initGroqClient();
 
   try {
@@ -26,8 +26,8 @@ export async function chat(systemPrompt: string, userMessage: string): Promise<s
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage }
       ],
-      temperature: 0.3,
-      max_tokens: 500
+      temperature: options.temperature ?? 0.3,
+      max_tokens: options.maxTokens ?? 500
     });
 
     const response = completion.choices[0]?.message?.content || '';
@@ -41,13 +41,14 @@ export async function chat(systemPrompt: string, userMessage: string): Promise<s
 export async function chatWithRetry(
   systemPrompt: string,
   userMessage: string,
-  maxRetries = 3
+  maxRetries = 3,
+  options: { temperature?: number; maxTokens?: number } = {}
 ): Promise<string> {
   let lastError: unknown;
 
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await chat(systemPrompt, userMessage);
+      return await chat(systemPrompt, userMessage, options);
     } catch (error) {
       lastError = error;
       logger.warn(`Groq API retry ${i + 1}/${maxRetries}`);

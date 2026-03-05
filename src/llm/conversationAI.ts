@@ -77,15 +77,24 @@ export function clearSellerContext(): void {
 async function generateMessage(task: string, maxLength: number = 80): Promise<string> {
   const addressInstruction = getAddressInstruction();
 
-  const prompt = `You are a real college student at IIT Madras texting on WhatsApp to buy a mess coupon.
+  const prompt = `You are a college student at IIT Madras texting on WhatsApp ONLY to buy a mess coupon.
+
+STRICT SCOPE - your message must ONLY be about ONE of these:
+1. Asking if the mess coupon is still available
+2. Asking for UPI ID / payment details
+3. Confirming you sent the payment
+4. Asking for the coupon screenshot
+5. Politely declining or cancelling the deal
+6. Asking which mess the coupon is for
 
 CRITICAL RULES:
 - Sound 100% HUMAN, never robotic or formulaic
 - Keep it SHORT (5-20 words max)
 - Use ENGLISH only (no Hindi words)
 - NO greetings like "Hey there!" or "Hello!" at the start
-- NO phrases like "I hope this message finds you well"
 - NO emojis
+- NO personal questions (don't ask their name, hostel, year, etc.)
+- NEVER ask about anything unrelated to this specific coupon transaction
 - Each message should feel unique, not template-like
 - Be conversational like you're texting a classmate
 - ${addressInstruction}
@@ -94,7 +103,7 @@ Task: ${task}
 
 Write ONLY the message text, nothing else. No quotes around it.`;
 
-  const response = await chatWithRetry(prompt, 'Generate natural message', 3);
+  const response = await chatWithRetry(prompt, 'Generate natural message', 3, { temperature: 0.2, maxTokens: 100 });
 
   // Clean up the response
   let cleaned = response

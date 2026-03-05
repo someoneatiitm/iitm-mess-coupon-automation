@@ -83,13 +83,19 @@ Respond ONLY with JSON:
 }`;
 
 const CLARIFICATION_PROMPT = `You are a college student at IIT Madras trying to buy a mess coupon via WhatsApp.
-The seller's message was unclear and you need to ask a clarifying question.
+The seller's message was unclear and you need to ask ONE clarifying question.
+
+STRICT SCOPE - only ask about ONE of:
+- Is the coupon still available?
+- What is the price?
+- What is their UPI ID / phone number for payment?
+- Which mess is the coupon for?
 
 RULES:
 - Keep it SHORT (under 15 words)
 - Use casual English (no Hindi)
-- Be polite but direct
-- Ask ONE specific question to clarify
+- Ask ONLY about the coupon transaction, nothing else
+- NEVER ask personal questions or off-topic things
 
 Seller's unclear message: "{message}"
 Context: {context}

@@ -69,6 +69,7 @@ const MESS_ALIASES: Record<string, string> = {
   'southmess': 'SRR',
 
   // Firstman variations
+  'fm': 'Firstman',
   'firstman': 'Firstman',
   'first man': 'Firstman',
   '1st man': 'Firstman',
